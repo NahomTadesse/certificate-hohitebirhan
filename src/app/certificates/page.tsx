@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import {
   FileText,
   CheckCircle,
@@ -35,7 +35,7 @@ const certificateOptions: { value: CertificateType; label: string; icon: any; co
   { value: "WEDDING", label: "Wedding Certificate", icon: HeartHandshake, color: "text-rose-600 bg-rose-100" },
 ];
 
-export default function CertificatesPage() {
+function CertificatesPageWr() {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
   const [children, setChildren] = useState<{ id: string; fullName: string }[]>([]);
@@ -259,5 +259,14 @@ export default function CertificatesPage() {
         }
       `}</style>
     </DashboardLayout>
+  );
+}
+
+
+export default function CertificatesPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CertificatesPageWr />
+    </Suspense>
   );
 }

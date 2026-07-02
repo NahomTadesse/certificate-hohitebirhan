@@ -32,13 +32,39 @@ export interface UpdateFatherPayload {
 
 // GET: List all children
 // GET: List all children
+// export const fetchChildren = async (): Promise<Child[]> => {
+//   const response = await authenticatedFetch<any>("/api/children");
+  
+//   // Handle the API response structure
+//   // Response format: { message: string, success: boolean, data: Child[] }
+//   if (response && response.success === true && Array.isArray(response.data)) {
+//     return response.data;
+//   }
+  
+//   // Fallback: if response is directly an array
+//   if (Array.isArray(response)) {
+//     return response;
+//   }
+  
+//   // If response is empty or invalid, return empty array
+//   console.warn('Unexpected response structure from fetchChildren:', response);
+//   return [];
+// };
+// GET: List all children
 export const fetchChildren = async (): Promise<Child[]> => {
   const response = await authenticatedFetch<any>("/api/children");
   
-  // Handle the API response structure
-  // Response format: { message: string, success: boolean, data: Child[] }
-  if (response && response.success === true && Array.isArray(response.data)) {
-    return response.data;
+  // Handle the paginated API response structure
+  // Response format: { message: string, success: boolean, data: { content: Child[], pageable: {...}, ... } }
+  if (response && response.success === true && response.data) {
+    // Check if response.data has a content property (paginated response)
+    if (Array.isArray(response.data.content)) {
+      return response.data.content;
+    }
+    // Fallback: if response.data is directly an array
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
   }
   
   // Fallback: if response is directly an array

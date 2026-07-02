@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import {
   Banknote,
   CheckCircle,
@@ -31,7 +31,7 @@ import { fetchChildrenForDropdown } from "@/services/childrenService";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "next/navigation";
 
-export default function PaymentsPage() {
+function PaymentsPageWra() {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
   const preselectedChildId = searchParams?.get("childId") || "";
@@ -250,5 +250,14 @@ export default function PaymentsPage() {
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+
+export default function PaymentsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PaymentsPageWra />
+    </Suspense>
   );
 }
