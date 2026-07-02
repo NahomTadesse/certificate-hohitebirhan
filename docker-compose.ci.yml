@@ -1,0 +1,6 @@
+services:
+  api:
+    image: 923083696216.dkr.ecr.eu-west-1.amazonaws.com/city-transit-frontend-dev-ecr:${IMAGE_TAG}
+    build:
+      context: .
+      dockerfile: Dockerfile

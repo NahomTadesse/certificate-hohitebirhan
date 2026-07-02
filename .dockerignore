@@ -1,0 +1,11 @@
+.git
+.github
+.next
+node_modules
+README.md
+.env
+.env.*
+!.env.example
+!.env.docker.example
+npm-debug.log*
+.vscode
