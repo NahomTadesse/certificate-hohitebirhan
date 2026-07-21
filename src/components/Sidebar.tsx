@@ -24,6 +24,9 @@ import {
   TrafficConeIcon,
   Landmark,
   FileText,
+  Cross,
+  Users2,
+  ShieldCheck,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -107,6 +110,14 @@ const baseMenu: MenuSection[] = [
          
         ],
       },
+      {
+        label: "Family",
+        icon: Users2,
+        path: "family",
+        subMenu: [
+          { label: "Family Management", path: "family", type: "view" },
+        ],
+      },
     
 
  
@@ -126,6 +137,23 @@ const baseMenu: MenuSection[] = [
         icon: FileText,
         path: "certificates",
         subMenu: [{ label: "Generate Certificate", path: "certificates", type: "view" }],
+      },
+      {
+        label: "Death Records",
+        icon: Cross,
+        path: "death-records",
+        subMenu: [{ label: "Death Record Management", path: "death-records", type: "view" }],
+      },
+    ],
+  },
+  {
+    section: "ADMINISTRATION",
+    items: [
+      {
+        label: "Users",
+        icon: ShieldCheck,
+        path: "users",
+        subMenu: [{ label: "User Management", path: "users", type: "view" }],
       },
     ],
   },

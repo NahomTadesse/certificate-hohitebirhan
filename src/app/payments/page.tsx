@@ -25,8 +25,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { Badge } from "@/components/ui/badge";
 import DashboardLayout from "../dashboard/layout";
-import { makePayment, PaymentType } from "@/services/paymentService";
+import {
+  makePayment,
+  PaymentType,
+  fetchPaymentHistory,
+  fetchPaymentsReport,
+  waiveCertificateFee,
+  Payment,
+  PaymentReportType,
+} from "@/services/paymentService";
 import { fetchChildrenForDropdown } from "@/services/childrenService";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "next/navigation";
@@ -108,6 +117,71 @@ function PaymentsPageWra() {
       setAlert({ type: "error", message: err.message || "Payment failed" });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // --- History lookup ---
+  const [historyChildId, setHistoryChildId] = useState("");
+  const [history, setHistory] = useState<Payment[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const handleLoadHistory = async () => {
+    if (!historyChildId) return;
+    setLoadingHistory(true);
+    try {
+      const data = await fetchPaymentHistory(historyChildId);
+      setHistory(data || []);
+    } catch (err: any) {
+      setAlert({ type: "error", message: err.message || "Failed to load payment history" });
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // --- Waive certificate fee ---
+  const [waiveChildId, setWaiveChildId] = useState("");
+  const [waiveReason, setWaiveReason] = useState("");
+  const [isWaiving, setIsWaiving] = useState(false);
+
+  const handleWaive = async () => {
+    if (!waiveChildId || !waiveReason) {
+      setAlert({ type: "error", message: "Select a child and provide a reason to waive the fee." });
+      return;
+    }
+    setIsWaiving(true);
+    try {
+      await waiveCertificateFee(waiveChildId, waiveReason);
+      setAlert({ type: "success", message: "Certificate fee waived successfully!" });
+      setWaiveChildId("");
+      setWaiveReason("");
+      setTimeout(() => setAlert(null), 3000);
+    } catch (err: any) {
+      setAlert({ type: "error", message: err.message || "Failed to waive fee" });
+    } finally {
+      setIsWaiving(false);
+    }
+  };
+
+  // --- Report ---
+  const [reportType, setReportType] = useState<PaymentReportType>("MEMBERSHIP");
+  const [reportStart, setReportStart] = useState("");
+  const [reportEnd, setReportEnd] = useState("");
+  const [report, setReport] = useState<Payment[]>([]);
+  const [loadingReport, setLoadingReport] = useState(false);
+
+  const handleLoadReport = async () => {
+    if (!reportStart || !reportEnd) {
+      setAlert({ type: "error", message: "Select a start and end date for the report." });
+      return;
+    }
+    setLoadingReport(true);
+    try {
+      const data = await fetchPaymentsReport(reportType, reportStart, reportEnd);
+      setReport(data || []);
+    } catch (err: any) {
+      setAlert({ type: "error", message: err.message || "Failed to load report" });
+    } finally {
+      setLoadingReport(false);
     }
   };
 
@@ -248,6 +322,152 @@ function PaymentsPageWra() {
             </CardContent>
           </Card>
         </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("Payment History")}</CardTitle>
+              <CardDescription>{t("View all payments recorded for a specific child")}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <Select value={historyChildId} onValueChange={setHistoryChildId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("Select a child")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {children.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.fullName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={handleLoadHistory} disabled={loadingHistory}>
+                  {loadingHistory ? t("Loading...") : t("Load")}
+                </Button>
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {history.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    {t("No history loaded yet.")}
+                  </p>
+                ) : (
+                  history.map((p, i) => (
+                    <div key={p.id || i} className="flex justify-between items-center text-sm border-b pb-2">
+                      <div>
+                        <div className="font-medium">{p.type}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {p.periodStart} – {p.periodEnd}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold">{p.amount?.toFixed?.(2) ?? p.amount}</div>
+                        <Badge variant="outline">{p.status}</Badge>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("Waive Certificate Fee")}</CardTitle>
+              <CardDescription>{t("Waive the certificate fee for a child with a documented reason")}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>{t("Child")} *</Label>
+                <Select value={waiveChildId} onValueChange={setWaiveChildId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("Select a child")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {children.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.fullName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>{t("Reason")} *</Label>
+                <Input value={waiveReason} onChange={(e) => setWaiveReason(e.target.value)} />
+              </div>
+              <Button variant="outline" className="w-full" onClick={handleWaive} disabled={isWaiving}>
+                {isWaiving ? t("Waiving...") : t("Waive Fee")}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("Payments Report")}</CardTitle>
+            <CardDescription>{t("Generate a report of payments within a date range")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div>
+                <Label>{t("Type")}</Label>
+                <Select value={reportType} onValueChange={(v) => setReportType(v as PaymentReportType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MEMBERSHIP">{t("Membership")}</SelectItem>
+                    <SelectItem value="CERTIFICATE">{t("Certificate")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>{t("Start Date")}</Label>
+                <Input type="date" value={reportStart} onChange={(e) => setReportStart(e.target.value)} />
+              </div>
+              <div>
+                <Label>{t("End Date")}</Label>
+                <Input type="date" value={reportEnd} onChange={(e) => setReportEnd(e.target.value)} />
+              </div>
+              <div className="flex items-end">
+                <Button className="w-full" onClick={handleLoadReport} disabled={loadingReport}>
+                  {loadingReport ? t("Loading...") : t("Run Report")}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+              {report.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  {t("Run a report to see results here.")}
+                </p>
+              ) : (
+                <>
+                  <div className="flex justify-between text-sm font-semibold border-b pb-2">
+                    <span>{t("Total")}</span>
+                    <span>{report.reduce((sum, p) => sum + (p.amount || 0), 0).toFixed(2)}</span>
+                  </div>
+                  {report.map((p, i) => (
+                    <div key={p.id || i} className="flex justify-between items-center text-sm border-b pb-2">
+                      <div>
+                        <div className="font-medium">{p.childName || p.childId}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {p.periodStart} – {p.periodEnd}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold">{p.amount?.toFixed?.(2) ?? p.amount}</div>
+                        <Badge variant="outline">{p.status}</Badge>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );

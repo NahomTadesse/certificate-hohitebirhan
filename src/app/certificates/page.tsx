@@ -9,9 +9,12 @@ import {
   Cross,
   HeartHandshake,
   Award,
+  Droplets,
+  ShieldCheck,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -24,15 +27,25 @@ import {
 } from "@/components/ui/select";
 
 import DashboardLayout from "../dashboard/layout";
-import { generateCertificate, CertificateType } from "@/services/certificateService";
+import { generateCertificate, CertificateType, checkCertificateEligibility } from "@/services/certificateService";
+import { verifyBaptismCertificate } from "@/services/baptismCertificateService";
+import { verifyWeddingCertificate } from "@/services/weddingCertificateService";
+import { verifyDeathRecord } from "@/services/deathRecordService";
 import { fetchChildrenForDropdown } from "@/services/childrenService";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "next/navigation";
 
 const certificateOptions: { value: CertificateType; label: string; icon: any; color: string }[] = [
+  { value: "BAPTISM", label: "Baptism Certificate", icon: Droplets, color: "text-sky-600 bg-sky-100" },
   { value: "BIRTH", label: "Birth Certificate", icon: Baby, color: "text-emerald-600 bg-emerald-100" },
   { value: "DEATH", label: "Death Certificate", icon: Cross, color: "text-slate-600 bg-slate-100" },
   { value: "WEDDING", label: "Wedding Certificate", icon: HeartHandshake, color: "text-rose-600 bg-rose-100" },
+];
+
+const verifiableTypes: { value: "BAPTISM" | "WEDDING" | "DEATH"; label: string }[] = [
+  { value: "BAPTISM", label: "Baptism Certificate" },
+  { value: "WEDDING", label: "Wedding Certificate" },
+  { value: "DEATH", label: "Death Record" },
 ];
 
 function CertificatesPageWr() {
@@ -94,6 +107,43 @@ function CertificatesPageWr() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const [eligibility, setEligibility] = useState<string | null>(null);
+  const handleCheckEligibility = async () => {
+    if (!childId) {
+      setAlert({ type: "error", message: "Please select a child first." });
+      return;
+    }
+    try {
+      const res = await checkCertificateEligibility(childId);
+      setEligibility(res?.message || (res?.success ? "Eligible" : "Not eligible"));
+    } catch (err: any) {
+      setEligibility(err.message || "Could not determine eligibility");
+    }
+  };
+
+  // --- Verification tool ---
+  const [verifyType, setVerifyType] = useState<"BAPTISM" | "WEDDING" | "DEATH">("BAPTISM");
+  const [verifyRegNo, setVerifyRegNo] = useState("");
+  const [verifyResult, setVerifyResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [verifying, setVerifying] = useState(false);
+
+  const handleVerify = async () => {
+    if (!verifyRegNo) return;
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      let res;
+      if (verifyType === "BAPTISM") res = await verifyBaptismCertificate(verifyRegNo);
+      else if (verifyType === "WEDDING") res = await verifyWeddingCertificate(verifyRegNo);
+      else res = await verifyDeathRecord(verifyRegNo);
+      setVerifyResult({ ok: res?.success !== false, message: res?.message || "Verification complete." });
+    } catch (err: any) {
+      setVerifyResult({ ok: false, message: err.message || "Verification failed." });
+    } finally {
+      setVerifying(false);
+    }
   };
 
   return (
@@ -179,9 +229,58 @@ function CertificatesPageWr() {
               </Select>
             </div>
 
-            <Button onClick={handleGenerate} disabled={isSubmitting} size="lg" className="w-full">
-              {isSubmitting ? t("Generating...") : t("Generate Certificate")}
+            <div className="flex gap-2">
+              <Button onClick={handleGenerate} disabled={isSubmitting} size="lg" className="flex-1">
+                {isSubmitting ? t("Generating...") : t("Generate Certificate")}
+              </Button>
+              <Button onClick={handleCheckEligibility} variant="outline" size="lg">
+                {t("Check Eligibility")}
+              </Button>
+            </div>
+            {eligibility && (
+              <p className="text-sm text-muted-foreground border rounded-md p-2">{eligibility}</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" /> {t("Verify a Certificate")}
+            </CardTitle>
+            <CardDescription>{t("Look up a baptism, wedding, or death record by registration number")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-1">
+                <Label>{t("Type")}</Label>
+                <Select value={verifyType} onValueChange={(v) => setVerifyType(v as typeof verifyType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {verifiableTypes.map((v) => (
+                      <SelectItem key={v.value} value={v.value}>
+                        {t(v.label)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="sm:col-span-2">
+                <Label>{t("Registration Number")}</Label>
+                <Input value={verifyRegNo} onChange={(e) => setVerifyRegNo(e.target.value)} />
+              </div>
+            </div>
+            <Button onClick={handleVerify} disabled={verifying || !verifyRegNo} variant="outline" className="w-full">
+              {verifying ? t("Verifying...") : t("Verify")}
             </Button>
+            {verifyResult && (
+              <Alert variant={verifyResult.ok ? "default" : "destructive"}>
+                {verifyResult.ok ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                <AlertDescription>{verifyResult.message}</AlertDescription>
+              </Alert>
+            )}
           </CardContent>
         </Card>
 
