@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Users, Search, RefreshCw, AlertCircle, CheckCircle, XCircle, Edit } from "lucide-react";
+import { Users, Search, RefreshCw, AlertCircle, CheckCircle, XCircle, Edit, Plus } from "lucide-react";
 
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/DataTable";
@@ -29,6 +29,7 @@ import DashboardLayout from "../dashboard/layout";
 import {
   fetchAllUsersPaginated,
   updateUser,
+  createUser,
   AdminUser,
   UserRole,
   UserStatus,
@@ -71,7 +72,19 @@ export default function UsersManagement() {
     phoneNumber: string;
     role: UserRole;
     status: UserStatus;
-  }>({ firstName: "", lastName: "", phoneNumber: "", role: "USER", status: "ACTIVE" });
+    email: string;
+    userName: string;
+    password: string;
+  }>({
+    firstName: "",
+    lastName: "",
+    phoneNumber: "",
+    role: "USER",
+    status: "ACTIVE",
+    email: "",
+    userName: "",
+    password: "",
+  });
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -159,21 +172,63 @@ export default function UsersManagement() {
       phoneNumber: user.phoneNumber || "",
       role: (user.role as UserRole) || "USER",
       status: "ACTIVE",
+      email: user.email || "",
+      userName: user.userName || "",
+      password: "",
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleAddUser = () => {
+    setSelectedUser(null);
+    setFormState({
+      firstName: "",
+      lastName: "",
+      phoneNumber: "",
+      role: "USER",
+      status: "ACTIVE",
+      email: "",
+      userName: "",
+      password: "",
     });
     setIsDialogOpen(true);
   };
 
   const handleSubmit = async () => {
-    if (!selectedUser?.uuid) return;
     setIsSubmitting(true);
     try {
-      await updateUser(selectedUser.uuid, formState);
-      setAlert({ type: "success", message: "User updated successfully!" });
+      if (selectedUser?.uuid) {
+        await updateUser(selectedUser.uuid, {
+          firstName: formState.firstName,
+          lastName: formState.lastName,
+          phoneNumber: formState.phoneNumber,
+          role: formState.role,
+          status: formState.status,
+        });
+        setAlert({ type: "success", message: "User updated successfully!" });
+      } else {
+        if (!formState.userName || !formState.password) {
+          setAlert({ type: "error", message: "Username and password are required" });
+          setIsSubmitting(false);
+          return;
+        }
+        await createUser({
+          firstName: formState.firstName,
+          lastName: formState.lastName,
+          email: formState.email,
+          phoneNumber: formState.phoneNumber,
+          userName: formState.userName,
+          role: formState.role,
+          status: formState.status,
+          password: formState.password,
+        });
+        setAlert({ type: "success", message: "User created successfully!" });
+      }
       await loadUsers();
       setIsDialogOpen(false);
       setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Update failed" });
+      setAlert({ type: "error", message: err.message || "Operation failed" });
     } finally {
       setIsSubmitting(false);
     }
@@ -189,6 +244,9 @@ export default function UsersManagement() {
             </h1>
             <p className="text-muted-foreground">{t("Manage system users, roles, and statuses")}</p>
           </div>
+          <Button onClick={handleAddUser} size="lg">
+            <Plus className="h-5 w-5 mr-2" /> {t("Add User")}
+          </Button>
         </div>
 
         {error && (
@@ -254,7 +312,9 @@ export default function UsersManagement() {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle className="text-2xl">{t("Edit User")}</DialogTitle>
+              <DialogTitle className="text-2xl">
+                {selectedUser ? t("Edit User") : t("Add New User")}
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
@@ -273,6 +333,25 @@ export default function UsersManagement() {
                   />
                 </div>
               </div>
+              {!selectedUser && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t("Username")} *</Label>
+                    <Input
+                      value={formState.userName}
+                      onChange={(e) => setFormState({ ...formState, userName: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("Email")}</Label>
+                    <Input
+                      type="email"
+                      value={formState.email}
+                      onChange={(e) => setFormState({ ...formState, email: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
               <div>
                 <Label>{t("Phone Number")}</Label>
                 <Input
@@ -280,6 +359,16 @@ export default function UsersManagement() {
                   onChange={(e) => setFormState({ ...formState, phoneNumber: e.target.value })}
                 />
               </div>
+              {!selectedUser && (
+                <div>
+                  <Label>{t("Password")} *</Label>
+                  <Input
+                    type="password"
+                    value={formState.password}
+                    onChange={(e) => setFormState({ ...formState, password: e.target.value })}
+                  />
+                </div>
+              )}
               <div>
                 <Label>{t("Role")}</Label>
                 <Select value={formState.role} onValueChange={(v) => setFormState({ ...formState, role: v as UserRole })}>
@@ -319,7 +408,11 @@ export default function UsersManagement() {
                 {t("Cancel")}
               </Button>
               <Button onClick={handleSubmit} disabled={isSubmitting}>
-                {isSubmitting ? t("Saving...") : t("Update")}
+                {isSubmitting
+                  ? t("Saving...")
+                  : selectedUser
+                  ? t("Update")
+                  : t("Create")}
               </Button>
             </DialogFooter>
           </DialogContent>

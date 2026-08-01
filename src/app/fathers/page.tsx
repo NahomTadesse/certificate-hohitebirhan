@@ -1,3 +1,5 @@
+
+
 // "use client";
 
 // import { useState, useEffect, useCallback, useMemo } from "react";
@@ -23,6 +25,14 @@
 //   Award,
 //   Landmark,
 //   Filter,
+//   Eye,
+//   Info,
+//   Clock,
+//   Building2,
+//   UserCog,
+//   Hash,
+//   CalendarDays,
+//   MapPin,
 // } from "lucide-react";
 
 // import { ColumnDef } from "@tanstack/react-table";
@@ -48,6 +58,22 @@
 // } from "@/components/ui/select";
 // import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // import { Textarea } from "@/components/ui/textarea";
+// import {
+//   Card,
+//   CardContent,
+//   CardDescription,
+//   CardHeader,
+//   CardTitle,
+// } from "@/components/ui/card";
+// import {
+//   Table,
+//   TableBody,
+//   TableCell,
+//   TableHead,
+//   TableHeader,
+//   TableRow,
+// } from "@/components/ui/table";
+// import { ScrollArea } from "@/components/ui/scroll-area";
 
 // import DashboardLayout from "../dashboard/layout";
 // import {
@@ -294,18 +320,6 @@
 //         </div>
 //       ),
 //     },
-//     // {
-//     //   accessorKey: "spiritualInfo",
-//     //   header: t("Children Count"),
-//     //   cell: ({ row }) => (
-//     //     <div className="flex items-center gap-2">
-//     //       <Users className="h-3 w-3 text-muted-foreground" />
-//     //       <span className="text-sm font-semibold">
-//     //         {row.original.spiritualInfo?.[0]?.numberOfChildren || 0} children
-//     //       </span>
-//     //     </div>
-//     //   ),
-//     // },
 //     {
 //       accessorKey: "clericalRank",
 //       header: t("Rank"),
@@ -324,6 +338,15 @@
 //           <Landmark className="h-3 w-3 text-muted-foreground" />
 //           <span className="text-sm">{row.original.dioceseName || "-"}</span>
 //         </div>
+//       ),
+//     },
+//     {
+//       accessorKey: "monasticismType",
+//       header: t("Type"),
+//       cell: ({ row }) => (
+//         <Badge variant="outline">
+//           {row.original.monasticismType || "SECULAR"}
+//         </Badge>
 //       ),
 //     },
 //     {
@@ -348,12 +371,13 @@
 //           <Button
 //             size="sm"
 //             variant="ghost"
+//             title={t("View Details")}
 //             onClick={() => {
 //               setSelectedFather(row.original);
 //               setIsViewDialogOpen(true);
 //             }}
 //           >
-//             View
+//             <Eye className="h-4 w-4" />
 //           </Button>
 //           <Button
 //             size="sm"
@@ -548,6 +572,18 @@
 //     }
 //   };
 
+//   const getStatusBadge = (active: boolean) => {
+//     return active ? (
+//       <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
+//         <CheckCircle className="h-3 w-3 mr-1" /> Active
+//       </Badge>
+//     ) : (
+//       <Badge variant="destructive">
+//         <XCircle className="h-3 w-3 mr-1" /> Inactive
+//       </Badge>
+//     );
+//   };
+
 //   return (
 //     <DashboardLayout>
 //       <div className="p-6 space-y-6">
@@ -624,6 +660,326 @@
 //         ) : (
 //           <DataTable columns={columns} data={filteredFathers} />
 //         )}
+
+//         {/* View Father Dialog */}
+//         <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+//           <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+//             <DialogHeader>
+//               <DialogTitle className="flex items-center gap-2 text-2xl">
+//                 <UserCog className="h-6 w-6 text-primary" />
+//                 {t("Father Details")}
+//               </DialogTitle>
+//             </DialogHeader>
+            
+//             {selectedFather && (
+//               <div className="space-y-6">
+//                 {/* Basic Information Card */}
+//                 <Card>
+//                   <CardHeader>
+//                     <CardTitle className="flex items-center gap-2">
+//                       <Info className="h-5 w-5 text-primary" />
+//                       {t("Basic Information")}
+//                     </CardTitle>
+//                   </CardHeader>
+//                   <CardContent>
+//                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+//                       <div>
+//                         <Label className="text-muted-foreground">{t("Full Name")}</Label>
+//                         <p className="font-semibold text-lg">{selectedFather.fullName}</p>
+//                       </div>
+//                       <div>
+//                         <Label className="text-muted-foreground">{t("ID")}</Label>
+//                         <p className="font-semibold">{selectedFather.id}</p>
+//                       </div>
+//                       <div>
+//                         <Label className="text-muted-foreground">{t("Phone Number")}</Label>
+//                         <p className="font-semibold">{selectedFather.phoneNumber || "-"}</p>
+//                       </div>
+//                       <div>
+//                         <Label className="text-muted-foreground">{t("Church")}</Label>
+//                         <p className="font-semibold flex items-center gap-1">
+//                           <Church className="h-4 w-4 text-muted-foreground" />
+//                           {selectedFather.churchName || "-"}
+//                         </p>
+//                       </div>
+//                       <div>
+//                         <Label className="text-muted-foreground">{t("Diocese")}</Label>
+//                         <p className="font-semibold flex items-center gap-1">
+//                           <Landmark className="h-4 w-4 text-muted-foreground" />
+//                           {selectedFather.dioceseName || "-"}
+//                         </p>
+//                       </div>
+//                       <div>
+//                         <Label className="text-muted-foreground">{t("Status")}</Label>
+//                         <div className="mt-1">{getStatusBadge(selectedFather.active)}</div>
+//                       </div>
+//                     </div>
+//                   </CardContent>
+//                 </Card>
+
+//                 {/* Church & Rank Information */}
+//                 <Card>
+//                   <CardHeader>
+//                     <CardTitle className="flex items-center gap-2">
+//                       <Award className="h-5 w-5 text-primary" />
+//                       {t("Church & Rank Information")}
+//                     </CardTitle>
+//                   </CardHeader>
+//                   <CardContent>
+//                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+//                       <div>
+//                         <Label className="text-muted-foreground">{t("Clerical Rank")}</Label>
+//                         <p className="font-semibold">
+//                           {selectedFather.clericalRankLabel || selectedFather.clericalRank || "-"}
+//                         </p>
+//                       </div>
+//                       <div>
+//                         <Label className="text-muted-foreground">{t("Monasticism Type")}</Label>
+//                         <p className="font-semibold">{selectedFather.monasticismType || "-"}</p>
+//                       </div>
+//                       {selectedFather.monasticName && (
+//                         <div>
+//                           <Label className="text-muted-foreground">{t("Monastic Name")}</Label>
+//                           <p className="font-semibold">{selectedFather.monasticName}</p>
+//                         </div>
+//                       )}
+//                       {selectedFather.ordination && (
+//                         <div>
+//                           <Label className="text-muted-foreground">{t("Ordination")}</Label>
+//                           <p className="font-semibold">{selectedFather.ordination}</p>
+//                         </div>
+//                       )}
+//                     </div>
+//                   </CardContent>
+//                 </Card>
+
+//                 {/* Spiritual Information Card */}
+//                 {selectedFather.spiritualInfo && selectedFather.spiritualInfo.length > 0 && (
+//                   <Card>
+//                     <CardHeader>
+//                       <CardTitle className="flex items-center gap-2">
+//                         <Briefcase className="h-5 w-5 text-primary" />
+//                         {t("Spiritual Information")}
+//                       </CardTitle>
+//                       <CardDescription>
+//                         {t("Spiritual journey and ministry details")}
+//                       </CardDescription>
+//                     </CardHeader>
+//                     <CardContent>
+//                       <ScrollArea className="max-h-[300px]">
+//                         <div className="space-y-4">
+//                           {selectedFather.spiritualInfo.map((info, idx) => (
+//                             <div key={idx} className="border rounded-lg p-4">
+//                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+//                                 <div>
+//                                   <Label className="text-muted-foreground">{t("Kinet Place")}</Label>
+//                                   <p className="font-semibold">{info.kinetPlace || "-"}</p>
+//                                 </div>
+//                                 <div>
+//                                   <Label className="text-muted-foreground">{t("Kinet Date")}</Label>
+//                                   <p className="font-semibold">{info.kinetDate ? new Date(info.kinetDate).toLocaleDateString() : "-"}</p>
+//                                 </div>
+//                                 <div>
+//                                   <Label className="text-muted-foreground">{t("Current Church Start Date")}</Label>
+//                                   <p className="font-semibold">{info.currentChurchStartDate ? new Date(info.currentChurchStartDate).toLocaleDateString() : "-"}</p>
+//                                 </div>
+//                                 <div>
+//                                   <Label className="text-muted-foreground">{t("Role")}</Label>
+//                                   <p className="font-semibold">{info.role || "-"}</p>
+//                                 </div>
+//                                 <div>
+//                                   <Label className="text-muted-foreground">{t("Start Date")}</Label>
+//                                   <p className="font-semibold">{info.startDate ? new Date(info.startDate).toLocaleDateString() : "-"}</p>
+//                                 </div>
+//                                 <div>
+//                                   <Label className="text-muted-foreground">{t("End Date")}</Label>
+//                                   <p className="font-semibold">{info.endDate ? new Date(info.endDate).toLocaleDateString() : "-"}</p>
+//                                 </div>
+//                                 <div>
+//                                   <Label className="text-muted-foreground">{t("Number of Children")}</Label>
+//                                   <p className="font-semibold">{info.numberOfChildren || 0}</p>
+//                                 </div>
+//                               </div>
+//                             </div>
+//                           ))}
+//                         </div>
+//                       </ScrollArea>
+//                     </CardContent>
+//                   </Card>
+//                 )}
+
+//                 {/* Service History Card */}
+//                 {selectedFather.serviceHistory && selectedFather.serviceHistory.length > 0 && (
+//                   <Card>
+//                     <CardHeader>
+//                       <CardTitle className="flex items-center gap-2">
+//                         <Clock className="h-5 w-5 text-primary" />
+//                         {t("Service History")}
+//                       </CardTitle>
+//                       <CardDescription>
+//                         {t("Historical service records at different churches")}
+//                       </CardDescription>
+//                     </CardHeader>
+//                     <CardContent>
+//                       <ScrollArea className="max-h-[250px]">
+//                         <Table>
+//                           <TableHeader>
+//                             <TableRow>
+//                               <TableHead>{t("Church Name")}</TableHead>
+//                               <TableHead>{t("Start Date")}</TableHead>
+//                               <TableHead>{t("End Date")}</TableHead>
+//                             </TableRow>
+//                           </TableHeader>
+//                           <TableBody>
+//                             {selectedFather.serviceHistory.map((service, idx) => (
+//                               <TableRow key={idx}>
+//                                 <TableCell className="font-medium">{service.churchName || "-"}</TableCell>
+//                                 <TableCell>{service.startDate ? new Date(service.startDate).toLocaleDateString() : "-"}</TableCell>
+//                                 <TableCell>{service.endDate ? new Date(service.endDate).toLocaleDateString() : "-"}</TableCell>
+//                               </TableRow>
+//                             ))}
+//                           </TableBody>
+//                         </Table>
+//                       </ScrollArea>
+//                     </CardContent>
+//                   </Card>
+//                 )}
+
+//                 {/* Education Card */}
+//                 {selectedFather.educationList && selectedFather.educationList.length > 0 && (
+//                   <Card>
+//                     <CardHeader>
+//                       <CardTitle className="flex items-center gap-2">
+//                         <GraduationCap className="h-5 w-5 text-primary" />
+//                         {t("Education")}
+//                       </CardTitle>
+//                       <CardDescription>
+//                         {t("Educational background and qualifications")}
+//                       </CardDescription>
+//                     </CardHeader>
+//                     <CardContent>
+//                       <ScrollArea className="max-h-[250px]">
+//                         <Table>
+//                           <TableHeader>
+//                             <TableRow>
+//                               <TableHead>{t("Institution")}</TableHead>
+//                               <TableHead>{t("Field of Study")}</TableHead>
+//                               <TableHead>{t("Start Date")}</TableHead>
+//                               <TableHead>{t("End Date")}</TableHead>
+//                             </TableRow>
+//                           </TableHeader>
+//                           <TableBody>
+//                             {selectedFather.educationList.map((edu, idx) => (
+//                               <TableRow key={idx}>
+//                                 <TableCell className="font-medium">{edu.institutionName || "-"}</TableCell>
+//                                 <TableCell>{edu.fieldOfStudy || "-"}</TableCell>
+//                                 <TableCell>{edu.startDate ? new Date(edu.startDate).toLocaleDateString() : "-"}</TableCell>
+//                                 <TableCell>{edu.endDate ? new Date(edu.endDate).toLocaleDateString() : "-"}</TableCell>
+//                               </TableRow>
+//                             ))}
+//                           </TableBody>
+//                         </Table>
+//                       </ScrollArea>
+//                     </CardContent>
+//                   </Card>
+//                 )}
+
+//                 {/* Transfer History Card */}
+//                 {selectedFather.transferHistory && selectedFather.transferHistory.length > 0 && (
+//                   <Card>
+//                     <CardHeader>
+//                       <CardTitle className="flex items-center gap-2">
+//                         <ArrowRightLeft className="h-5 w-5 text-primary" />
+//                         {t("Transfer History")}
+//                       </CardTitle>
+//                       <CardDescription>
+//                         {t("Church transfer records")}
+//                       </CardDescription>
+//                     </CardHeader>
+//                     <CardContent>
+//                       <ScrollArea className="max-h-[250px]">
+//                         <Table>
+//                           <TableHeader>
+//                             <TableRow>
+//                               <TableHead>{t("From Church")}</TableHead>
+//                               <TableHead>{t("To Church")}</TableHead>
+//                               <TableHead>{t("Transfer Date")}</TableHead>
+//                             </TableRow>
+//                           </TableHeader>
+//                           <TableBody>
+//                             {selectedFather.transferHistory.map((transfer, idx) => (
+//                               <TableRow key={idx}>
+//                                 <TableCell className="font-medium">{transfer.fromChurchName || "-"}</TableCell>
+//                                 <TableCell>{transfer.toChurchName || "-"}</TableCell>
+//                                 <TableCell>
+//                                   {transfer.transferDate ? new Date(transfer.transferDate).toLocaleString() : "-"}
+//                                 </TableCell>
+//                               </TableRow>
+//                             ))}
+//                           </TableBody>
+//                         </Table>
+//                       </ScrollArea>
+//                     </CardContent>
+//                   </Card>
+//                 )}
+
+//                 {/* Quick Actions */}
+//                 <Card>
+//                   <CardHeader>
+//                     <CardTitle className="flex items-center gap-2">
+//                       <UserCog className="h-5 w-5 text-primary" />
+//                       {t("Quick Actions")}
+//                     </CardTitle>
+//                   </CardHeader>
+//                   <CardContent>
+//                     <div className="flex flex-wrap gap-2">
+//                       <Button
+//                         variant="outline"
+//                         size="sm"
+//                         onClick={() => {
+//                           setIsViewDialogOpen(false);
+//                           setTransferChurchId("");
+//                           setIsTransferDialogOpen(true);
+//                         }}
+//                       >
+//                         <ArrowRightLeft className="h-4 w-4 mr-2" />
+//                         {t("Transfer to Church")}
+//                       </Button>
+//                       <Button
+//                         variant="outline"
+//                         size="sm"
+//                         className="text-amber-600 hover:text-amber-700"
+//                         onClick={() => {
+//                           setIsViewDialogOpen(false);
+//                           setIsDeactivateDialogOpen(true);
+//                         }}
+//                       >
+//                         <Power className="h-4 w-4 mr-2" />
+//                         {t("Deactivate")}
+//                       </Button>
+//                       <Button
+//                         variant="outline"
+//                         size="sm"
+//                         className="text-red-600 hover:text-red-700"
+//                         onClick={() => {
+//                           setIsViewDialogOpen(false);
+//                           setIsDeleteDialogOpen(true);
+//                         }}
+//                       >
+//                         <Trash2 className="h-4 w-4 mr-2" />
+//                         {t("Delete")}
+//                       </Button>
+//                     </div>
+//                   </CardContent>
+//                 </Card>
+//               </div>
+//             )}
+
+//             <DialogFooter>
+//               <Button onClick={() => setIsViewDialogOpen(false)}>{t("Close")}</Button>
+//             </DialogFooter>
+//           </DialogContent>
+//         </Dialog>
 
 //         {/* Add Father Dialog */}
 //         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -937,110 +1293,6 @@
 //           </DialogContent>
 //         </Dialog>
 
-//         {/* View Father Dialog */}
-//         <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-//           <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-//             <DialogHeader>
-//               <DialogTitle className="text-2xl">Father Details</DialogTitle>
-//             </DialogHeader>
-//             {selectedFather && (
-//               <div className="space-y-4">
-//                 <div className="grid grid-cols-2 gap-4">
-//                   <div>
-//                     <Label className="font-semibold">Full Name</Label>
-//                     <p className="text-lg">{selectedFather.fullName}</p>
-//                   </div>
-//                   <div>
-//                     <Label className="font-semibold">Phone</Label>
-//                     <p>{selectedFather.phoneNumber || "-"}</p>
-//                   </div>
-//                   <div>
-//                     <Label className="font-semibold">Church</Label>
-//                     <p>{selectedFather.churchName || "-"}</p>
-//                   </div>
-//                   <div>
-//                     <Label className="font-semibold">Status</Label>
-//                     <Badge className={selectedFather.active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-//                       {selectedFather.active ? "ACTIVE" : "INACTIVE"}
-//                     </Badge>
-//                   </div>
-//                 </div>
-
-//                 {selectedFather.spiritualInfo && selectedFather.spiritualInfo.length > 0 && (
-//                   <div>
-//                     <Label className="font-semibold flex items-center gap-2">
-//                       <Briefcase className="h-4 w-4" /> Spiritual Information
-//                     </Label>
-//                     <div className="mt-2 space-y-2">
-//                       {selectedFather.spiritualInfo.map((info, idx) => (
-//                         <div key={idx} className="bg-muted p-3 rounded-lg">
-//                           <p><strong>Kinet Place:</strong> {info.kinetPlace}</p>
-//                           <p><strong>Kinet Date:</strong> {info.kinetDate}</p>
-//                           <p><strong>Role:</strong> {info.role}</p>
-//                           <p><strong>Children Count:</strong> {info.numberOfChildren}</p>
-//                         </div>
-//                       ))}
-//                     </div>
-//                   </div>
-//                 )}
-
-//                 {selectedFather.serviceHistory && selectedFather.serviceHistory.length > 0 && (
-//                   <div>
-//                     <Label className="font-semibold flex items-center gap-2">
-//                       <Church className="h-4 w-4" /> Service History
-//                     </Label>
-//                     <div className="mt-2 space-y-2">
-//                       {selectedFather.serviceHistory.map((service, idx) => (
-//                         <div key={idx} className="bg-muted p-3 rounded-lg">
-//                           <p><strong>Church:</strong> {service.churchName}</p>
-//                           <p><strong>Period:</strong> {service.startDate} - {service.endDate}</p>
-//                         </div>
-//                       ))}
-//                     </div>
-//                   </div>
-//                 )}
-
-//                 {selectedFather.educationList && selectedFather.educationList.length > 0 && (
-//                   <div>
-//                     <Label className="font-semibold flex items-center gap-2">
-//                       <GraduationCap className="h-4 w-4" /> Education
-//                     </Label>
-//                     <div className="mt-2 space-y-2">
-//                       {selectedFather.educationList.map((edu, idx) => (
-//                         <div key={idx} className="bg-muted p-3 rounded-lg">
-//                           <p><strong>Institution:</strong> {edu.institutionName}</p>
-//                           <p><strong>Field:</strong> {edu.fieldOfStudy}</p>
-//                           <p><strong>Period:</strong> {edu.startDate} - {edu.endDate}</p>
-//                         </div>
-//                       ))}
-//                     </div>
-//                   </div>
-//                 )}
-
-//                 {selectedFather.transferHistory && selectedFather.transferHistory.length > 0 && (
-//                   <div>
-//                     <Label className="font-semibold flex items-center gap-2">
-//                       <RefreshCw className="h-4 w-4" /> Transfer History
-//                     </Label>
-//                     <div className="mt-2 space-y-2">
-//                       {selectedFather.transferHistory.map((transfer, idx) => (
-//                         <div key={idx} className="bg-muted p-3 rounded-lg">
-//                           <p><strong>From:</strong> {transfer.fromChurchName}</p>
-//                           <p><strong>To:</strong> {transfer.toChurchName}</p>
-//                           <p><strong>Date:</strong> {new Date(transfer.transferDate).toLocaleString()}</p>
-//                         </div>
-//                       ))}
-//                     </div>
-//                   </div>
-//                 )}
-//               </div>
-//             )}
-//             <DialogFooter>
-//               <Button onClick={() => setIsViewDialogOpen(false)}>Close</Button>
-//             </DialogFooter>
-//           </DialogContent>
-//         </Dialog>
-
 //         {/* Transfer Dialog */}
 //         <Dialog open={isTransferDialogOpen} onOpenChange={setIsTransferDialogOpen}>
 //           <DialogContent>
@@ -1154,6 +1406,7 @@ import {
   Hash,
   CalendarDays,
   MapPin,
+  MoreVertical,
 } from "lucide-react";
 
 import { ColumnDef } from "@tanstack/react-table";
@@ -1195,6 +1448,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 import DashboardLayout from "../dashboard/layout";
 import {
@@ -1488,54 +1748,51 @@ const loadData = useCallback(async () => {
     {
       id: "actions",
       cell: ({ row }) => (
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            title={t("View Details")}
-            onClick={() => {
-              setSelectedFather(row.original);
-              setIsViewDialogOpen(true);
-            }}
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            title={t("Transfer to another church")}
-            onClick={() => {
-              setSelectedFather(row.original);
-              setTransferChurchId("");
-              setIsTransferDialogOpen(true);
-            }}
-          >
-            <ArrowRightLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-            title={t("Deactivate")}
-            onClick={() => {
-              setSelectedFather(row.original);
-              setIsDeactivateDialogOpen(true);
-            }}
-          >
-            <Power className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            onClick={() => {
-              setSelectedFather(row.original);
-              setIsDeleteDialogOpen(true);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="ghost">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => {
+                setSelectedFather(row.original);
+                setIsViewDialogOpen(true);
+              }}
+            >
+              <Eye className="h-4 w-4 mr-2" /> {t("View Details")}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                setSelectedFather(row.original);
+                setTransferChurchId("");
+                setIsTransferDialogOpen(true);
+              }}
+            >
+              <ArrowRightLeft className="h-4 w-4 mr-2" /> {t("Transfer to another church")}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-amber-600 focus:text-amber-600"
+              onClick={() => {
+                setSelectedFather(row.original);
+                setIsDeactivateDialogOpen(true);
+              }}
+            >
+              <Power className="h-4 w-4 mr-2" /> {t("Deactivate")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-red-600 focus:text-red-600"
+              onClick={() => {
+                setSelectedFather(row.original);
+                setIsDeleteDialogOpen(true);
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" /> {t("Delete")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ),
     },
   ];

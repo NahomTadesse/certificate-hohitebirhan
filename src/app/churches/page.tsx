@@ -58,9 +58,11 @@ import {
 } from "@/services/churchService";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
+import { fetchDioceses, Diocese } from "@/services/dioceseService";
 
 export default function ChurchManagement() {
   const [churches, setChurches] = useState<Church[]>([]);
+  const [dioceses, setDioceses] = useState<Diocese[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -110,9 +112,19 @@ export default function ChurchManagement() {
     }
   }, []);
 
+  const loadDioceses = useCallback(async () => {
+    try {
+      const list = await fetchDioceses();
+      setDioceses(list || []);
+    } catch (err) {
+      setDioceses([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadChurches();
-  }, [loadChurches]);
+    loadDioceses();
+  }, [loadChurches, loadDioceses]);
 
   const filteredChurches = useMemo(() => {
     return churches.filter((church) =>
@@ -377,11 +389,27 @@ export default function ChurchManagement() {
                 </div>
                 <div>
                   <Label>{t("Diocese")} *</Label>
-                  <Input
+                  <Select
                     value={formState.diocese}
-                    onChange={(e) => setFormState({ ...formState, diocese: e.target.value })}
-                    placeholder={t("e.g. Addis Ababa Diocese")}
-                  />
+                    onValueChange={(value) => setFormState({ ...formState, diocese: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("Select a diocese")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dioceses.length === 0 ? (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          {t("No dioceses found")}
+                        </div>
+                      ) : (
+                        dioceses.map((d) => (
+                          <SelectItem key={d.id} value={d.name}>
+                            {d.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
               </TabsContent>
               

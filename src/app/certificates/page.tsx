@@ -294,45 +294,79 @@ function CertificatesPageWr() {
             </div>
             <div
               id="certificate-preview"
-              className="relative border-8 border-double p-10 rounded-lg bg-gradient-to-br from-amber-50 to-yellow-50"
-              style={{ borderColor: "#c8a951" }}
+              className="relative border-4 p-3 bg-[#fdf8ec]"
+              style={{ borderColor: "#1e3a8a" }}
             >
-              <div className="absolute inset-4 border-2 rounded" style={{ borderColor: "#c8a95155" }} />
-              <div className="relative text-center space-y-4">
-                <div className="flex justify-center">
-                  <div className="p-4 rounded-full bg-amber-100 border-2" style={{ borderColor: "#c8a951" }}>
-                    <Award className="h-10 w-10" style={{ color: "#c8a951" }} />
+              <div className="border-2 p-6" style={{ borderColor: "#1e3a8a" }}>
+                {/* Header */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col items-center w-20 pt-1">
+                    <Award className="h-10 w-10" style={{ color: "#1e3a8a" }} />
+                  </div>
+                  <div className="flex-1 text-center">
+                    <p className="text-xs font-semibold" style={{ color: "#1e3a8a" }}>
+                      የኢትዮጵያ ኦርቶዶክስ ተዋሕዶ ቤተ ክርስቲያን
+                    </p>
+                    <p className="text-sm font-bold" style={{ color: "#1e3a8a" }}>
+                      ETHIOPIAN ORTHODOX TEWAHIDO CHURCH
+                    </p>
+                    <p className="text-base font-bold uppercase" style={{ color: "#1e3a8a" }}>
+                      {t(certificateOptions.find((o) => o.value === generatedCert.type)?.label || "Certificate")}
+                    </p>
+                  </div>
+                  <div
+                    className="w-16 h-20 border flex items-center justify-center text-[9px] text-center px-1 text-muted-foreground"
+                    style={{ borderColor: "#1e3a8a" }}
+                  >
+                    {t("Photo")}
                   </div>
                 </div>
-                <p className="uppercase tracking-widest text-xs text-amber-700">
-                  {t("Holy Trinity Church Administration")}
-                </p>
-                <h3 className="text-3xl font-serif font-bold text-amber-900">
-                  {t(certificateOptions.find((o) => o.value === generatedCert.type)?.label || "Certificate")}
-                </h3>
-                <p className="text-sm text-muted-foreground">{t("This is to certify that")}</p>
-                <p className="text-2xl font-serif font-semibold text-slate-800">{generatedCert.childName}</p>
-                <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  {t("is duly recorded in the church registry with the certificate details below.")}
-                </p>
-                <div className="flex justify-center gap-10 pt-4 text-sm">
-                  <div>
-                    <div className="text-muted-foreground text-xs">{t("Certificate No.")}</div>
-                    <div className="font-mono font-semibold">{generatedCert.certId}</div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground text-xs">{t("Date Issued")}</div>
-                    <div className="font-semibold">{generatedCert.date}</div>
-                  </div>
+
+                <div className="text-right text-xs mt-2" style={{ color: "#1e3a8a" }}>
+                  {t("Registration No.")} <span className="font-mono">{generatedCert.certId}</span>
                 </div>
-                <div className="pt-6 flex justify-between max-w-sm mx-auto text-xs text-muted-foreground">
+
+                {/* Fields */}
+                <div className="mt-4 space-y-2 text-sm">
+                  {[
+                    { am: "የቤተሰብ ስም", en: "Family Name", value: generatedCert.childName.split(" ").slice(-1)[0] },
+                    { am: "የግል ስም", en: "Proper Name", value: generatedCert.childName.split(" ")[0] },
+                    { am: "የተጠመቀው(ችው) ክርስትና ስም", en: "Christian Name", value: "" },
+                    { am: "የአባት ስም", en: "Father's Name", value: "" },
+                    { am: "የእናት ስም", en: "Mother's Name", value: "" },
+                    { am: "የክርስትና አባት (እናት) ስም", en: "God Father's or Mothers' Name", value: "" },
+                    { am: "ሀገር", en: "Country", value: "" },
+                    { am: "የተወለደበት(ችበት) ቦታ", en: "Place of Birth", value: "" },
+                    { am: "የትውልድ ሀገር", en: "Nationality", value: "" },
+                    { am: "የተወለደበት(ችበት) ቀን", en: "Date of Birth", value: "" },
+                    { am: "የተጠመቀበት(ችበት) ቀን", en: "Date of Baptism", value: generatedCert.date },
+                    { am: "የተጠመቀበት(ችበት) ቤተ ክርስቲያን", en: "Church", value: "" },
+                    { am: "ዜግነት", en: "Citizenship", value: "" },
+                    { am: "አጥማቂው ካህን", en: "Baptizing Priest", value: "" },
+                  ].map((f, i) => (
+                    <div key={i} className="grid grid-cols-[1fr_1fr_1.4fr] gap-2 border-b border-dotted pb-1">
+                      <span className="text-xs" style={{ color: "#1e3a8a" }}>{f.am}</span>
+                      <span className="text-xs italic">{f.en}</span>
+                      <span className="text-xs font-medium">{f.value || "……………………………"}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-xs mt-4 leading-relaxed">
+                  {t("This is to certify that")} <strong>{generatedCert.childName}</strong>{" "}
+                  {t(
+                    "is baptized according to the Law and Order of Ethiopian Orthodox Tewahido Church at the above mentioned place and date."
+                  )}
+                </p>
+
+                <div className="flex justify-between mt-8 text-xs">
                   <div className="text-center">
-                    <div className="w-24 border-t border-slate-400 mb-1" />
-                    {t("Registrar")}
+                    <div className="w-32 border-t border-slate-500 mb-1" />
+                    {t("Church's administrator Signature")}
                   </div>
                   <div className="text-center">
-                    <div className="w-24 border-t border-slate-400 mb-1" />
-                    {t("Bishop's Seal")}
+                    <div className="w-32 border-t border-slate-500 mb-1" />
+                    {t("Date")} {generatedCert.date}
                   </div>
                 </div>
               </div>

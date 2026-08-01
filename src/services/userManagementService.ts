@@ -41,6 +41,22 @@ export interface UpdateUserPayload {
   status?: UserStatus;
 }
 
+export interface CreateUserPayload {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phoneNumber?: string;
+  userName?: string;
+  role?: UserRole;
+  status?: UserStatus;
+  password?: string;
+}
+
+export interface AuthenticationResponse {
+  message?: string;
+  code?: number;
+}
+
 export interface BaseResponse<T = any> {
   message?: string;
   success?: boolean;
@@ -80,6 +96,14 @@ export const fetchUserDetailsByToken = async (accessToken: string): Promise<Base
   return await authenticatedFetch<BaseResponse>(
     `/api/v1/user/user-details?accessToken=${encodeURIComponent(accessToken)}`
   );
+};
+
+// POST: Create/register a new user
+export const createUser = async (payload: CreateUserPayload): Promise<AuthenticationResponse> => {
+  return await authenticatedFetch<AuthenticationResponse>("/api/v1/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 };
 
 // PUT: Update a user (name, phone, role, status)
