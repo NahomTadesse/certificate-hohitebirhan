@@ -49,7 +49,8 @@ const verifiableTypes: { value: "BAPTISM" | "WEDDING" | "DEATH"; label: string }
 ];
 
 function CertificatesPageWr() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const certLang = i18n.language === "am" ? "am" : "en";
   const searchParams = useSearchParams();
   const [children, setChildren] = useState<{ id: string; fullName: string }[]>([]);
   const [loadingChildren, setLoadingChildren] = useState(true);
@@ -304,12 +305,15 @@ function CertificatesPageWr() {
                     <Award className="h-10 w-10" style={{ color: "#1e3a8a" }} />
                   </div>
                   <div className="flex-1 text-center">
-                    <p className="text-xs font-semibold" style={{ color: "#1e3a8a" }}>
-                      የኢትዮጵያ ኦርቶዶክስ ተዋሕዶ ቤተ ክርስቲያን
-                    </p>
-                    <p className="text-sm font-bold" style={{ color: "#1e3a8a" }}>
-                      ETHIOPIAN ORTHODOX TEWAHIDO CHURCH
-                    </p>
+                    {certLang === "am" ? (
+                      <p className="text-sm font-bold" style={{ color: "#1e3a8a" }}>
+                        የኢትዮጵያ ኦርቶዶክስ ተዋሕዶ ቤተ ክርስቲያን
+                      </p>
+                    ) : (
+                      <p className="text-sm font-bold" style={{ color: "#1e3a8a" }}>
+                        ETHIOPIAN ORTHODOX TEWAHIDO CHURCH
+                      </p>
+                    )}
                     <p className="text-base font-bold uppercase" style={{ color: "#1e3a8a" }}>
                       {t(certificateOptions.find((o) => o.value === generatedCert.type)?.label || "Certificate")}
                     </p>
@@ -344,9 +348,13 @@ function CertificatesPageWr() {
                     { am: "ዜግነት", en: "Citizenship", value: "" },
                     { am: "አጥማቂው ካህን", en: "Baptizing Priest", value: "" },
                   ].map((f, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_1fr_1.4fr] gap-2 border-b border-dotted pb-1">
-                      <span className="text-xs" style={{ color: "#1e3a8a" }}>{f.am}</span>
-                      <span className="text-xs italic">{f.en}</span>
+                    <div key={i} className="grid grid-cols-[1.4fr_1.6fr] gap-2 border-b border-dotted pb-1">
+                      <span
+                        className={certLang === "am" ? "text-xs" : "text-xs italic"}
+                        style={certLang === "am" ? { color: "#1e3a8a" } : undefined}
+                      >
+                        {certLang === "am" ? f.am : f.en}
+                      </span>
                       <span className="text-xs font-medium">{f.value || "……………………………"}</span>
                     </div>
                   ))}
