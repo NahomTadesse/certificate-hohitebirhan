@@ -426,6 +426,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 import {
   Users2,
   UserPlus,
@@ -467,7 +468,6 @@ const NONE_VALUE = "__none__";
 export default function FamilyManagement() {
   const { t } = useTranslation();
   const [children, setChildren] = useState<{ id: string; fullName: string }[]>([]);
-  const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadChildren = useCallback(async () => {
@@ -484,8 +484,11 @@ export default function FamilyManagement() {
   }, [loadChildren]);
 
   const showResult = (type: "success" | "error", message: string) => {
-    setAlert({ type, message });
-    setTimeout(() => setAlert(null), 4000);
+    if (type === "error") {
+      toast.error(message);
+    } else {
+      toast.success(message);
+    }
   };
 
   // --- Add Member state ---
@@ -592,13 +595,6 @@ export default function FamilyManagement() {
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
-
-        {alert && (
-          <Alert variant={alert.type === "error" ? "destructive" : "default"}>
-            {alert.type === "success" ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-            <AlertDescription>{alert.message}</AlertDescription>
-          </Alert>
-        )}
 
         <Tabs defaultValue="member" className="w-full">
           <TabsList>
@@ -846,16 +842,14 @@ export default function FamilyManagement() {
           </TabsContent>
         </Tabs>
 
-        {!alert && (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              {t(
-                "Tip: New family members can be linked to an existing registered child by selecting them from the dropdown, instead of creating a duplicate record."
-              )}
-            </AlertDescription>
-          </Alert>
-        )}
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {t(
+              "Tip: New family members can be linked to an existing registered child by selecting them from the dropdown, instead of creating a duplicate record."
+            )}
+          </AlertDescription>
+        </Alert>
       </div>
     </DashboardLayout>
   );

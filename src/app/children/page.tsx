@@ -1747,6 +1747,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { toast } from "sonner";
 import {
   Users,
   Plus,
@@ -1847,10 +1848,10 @@ export default function ChildrenManagement() {
   const [fathers, setFathers] = useState<Father[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isChangeFatherDialogOpen, setIsChangeFatherDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
@@ -1893,10 +1894,13 @@ export default function ChildrenManagement() {
       name:
         child.fullName ||
         `${child.firstName || ""} ${child.middleName || ""} ${child.lastName || ""}`.trim(),
+      christianName: (child as any).christianName || "",
       dob: child.dateOfBirth,
+      fatherName: child.fatherName || "",
+      phone: child.phoneNumber || "",
       church: (child as any).churchName || "",
     });
-    return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrData)}`;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrData)}`;
   };
 
   const handleViewHistory = async (child: Child) => {
@@ -1934,12 +1938,12 @@ export default function ChildrenManagement() {
     reason: "",
   });
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (search?: string) => {
     setLoading(true);
     setError(null);
     try {
       const [childrenData, fathersData] = await Promise.all([
-        fetchChildren(),
+        fetchChildren(search),
         fetchFathersForDropdown(),
       ]);
       
@@ -1997,21 +2001,40 @@ export default function ChildrenManagement() {
     loadData();
   }, [loadData]);
 
+  // Debounce the search box, then ask the backend to filter the list
+  // (a local filter below still applies as a fallback in case the API
+  // doesn't yet honor the `search` query param).
+  const isFirstSearchRender = useRef(true);
+  useEffect(() => {
+    if (isFirstSearchRender.current) {
+      isFirstSearchRender.current = false;
+      return;
+    }
+    const handle = setTimeout(() => {
+      loadData(searchQuery);
+    }, 400);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
+
   const filteredChildren = useMemo(() => {
     if (!Array.isArray(children)) {
       return [];
     }
-    
+
     const query = searchQuery.toLowerCase().trim();
     if (!query) {
       return children;
     }
-    
+
     return children.filter((child) => {
-      const fullName = `${child.firstName} ${child.middleName || ''} ${child.lastName}`.toLowerCase();
+      const fullName = (
+        child.fullName ||
+        `${child.firstName || ''} ${child.middleName || ''} ${child.lastName || ''}`
+      ).toLowerCase();
       const phone = child.phoneNumber?.toLowerCase() || '';
       const sebekaId = child.sebekaMemberId?.toLowerCase() || '';
-      
+
       return fullName.includes(query) || phone.includes(query) || sebekaId.includes(query);
     });
   }, [children, searchQuery]);
@@ -2173,26 +2196,38 @@ export default function ChildrenManagement() {
       gender: "",
       fatherId: "",
     });
+    setFormErrors({});
     setIsDialogOpen(true);
   };
 
+  const validateFormState = () => {
+    const errors: Record<string, string> = {};
+    if (!formState.firstName) errors.firstName = t("First name is required");
+    if (!formState.lastName) errors.lastName = t("Last name is required");
+    if (!formState.dateOfBirth) errors.dateOfBirth = t("Date of birth is required");
+    if (!formState.gender) errors.gender = t("Gender is required");
+    if (!formState.fatherId) errors.fatherId = t("Please select a father");
+    return errors;
+  };
+
   const handleSubmit = async () => {
-    if (!formState.firstName || !formState.lastName || !formState.dateOfBirth || !formState.gender || !formState.fatherId) {
-      setAlert({ type: "error", message: "Please fill all required fields" });
+    const errors = validateFormState();
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error(t("Please fill all required fields"));
       return;
     }
 
     setIsSubmitting(true);
-    setAlert(null);
 
     try {
       await createChild(formState);
-      setAlert({ type: "success", message: "Child registered successfully!" });
+      toast.success(t("Child registered successfully!"));
       await loadData();
       setIsDialogOpen(false);
-      setTimeout(() => setAlert(null), 3000);
+      setFormErrors({});
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Operation failed" });
+      toast.error(err.message || t("Operation failed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -2200,21 +2235,19 @@ export default function ChildrenManagement() {
 
   const handleChangeFather = async () => {
     if (!selectedChild || !changeFatherState.newFatherId || !changeFatherState.reason) {
-      setAlert({ type: "error", message: "Please select a new father and provide a reason" });
+      toast.error("Please select a new father and provide a reason");
       return;
     }
 
     setIsSubmitting(true);
-    setAlert(null);
 
     try {
       await changeFather(selectedChild.id, changeFatherState.newFatherId, changeFatherState.reason);
-      setAlert({ type: "success", message: "Father changed successfully!" });
+      toast.success("Father changed successfully!");
       await loadData();
       setIsChangeFatherDialogOpen(false);
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Operation failed" });
+      toast.error(err.message || "Operation failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -2226,11 +2259,10 @@ export default function ChildrenManagement() {
     setIsSubmitting(true);
     try {
       await deleteChild(selectedChild.id);
-      setAlert({ type: "success", message: "Child deleted successfully!" });
+      toast.success("Child deleted successfully!");
       await loadData();
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Delete failed" });
+      toast.error(err.message || "Delete failed");
     } finally {
       setIsSubmitting(false);
       setIsDeleteDialogOpen(false);
@@ -2250,20 +2282,6 @@ export default function ChildrenManagement() {
           </Button>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {alert && (
-          <Alert variant={alert.type === "error" ? "destructive" : "default"}>
-            {alert.type === "success" ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-            <AlertDescription>{alert.message}</AlertDescription>
-          </Alert>
-        )}
-
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -2274,7 +2292,7 @@ export default function ChildrenManagement() {
               className="pl-10"
             />
           </div>
-          <Button variant="outline" size="icon" onClick={loadData} disabled={loading}>
+          <Button variant="outline" size="icon" onClick={() => loadData()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
@@ -2518,9 +2536,17 @@ export default function ChildrenManagement() {
                   <Label>{t("First Name")} *</Label>
                   <Input
                     value={formState.firstName}
-                    onChange={(e) => setFormState({ ...formState, firstName: e.target.value })}
+                    onChange={(e) => {
+                      setFormState({ ...formState, firstName: e.target.value });
+                      if (formErrors.firstName) setFormErrors({ ...formErrors, firstName: "" });
+                    }}
                     placeholder="First name"
+                    aria-invalid={!!formErrors.firstName}
+                    className={formErrors.firstName ? "border-destructive focus-visible:ring-destructive" : ""}
                   />
+                  {formErrors.firstName && (
+                    <p className="text-xs text-destructive mt-1">{formErrors.firstName}</p>
+                  )}
                 </div>
                 <div>
                   <Label>{t("Middle Name")}</Label>
@@ -2535,9 +2561,17 @@ export default function ChildrenManagement() {
                 <Label>{t("Last Name")} *</Label>
                 <Input
                   value={formState.lastName}
-                  onChange={(e) => setFormState({ ...formState, lastName: e.target.value })}
+                  onChange={(e) => {
+                    setFormState({ ...formState, lastName: e.target.value });
+                    if (formErrors.lastName) setFormErrors({ ...formErrors, lastName: "" });
+                  }}
                   placeholder="Last name"
+                  aria-invalid={!!formErrors.lastName}
+                  className={formErrors.lastName ? "border-destructive focus-visible:ring-destructive" : ""}
                 />
+                {formErrors.lastName && (
+                  <p className="text-xs text-destructive mt-1">{formErrors.lastName}</p>
+                )}
               </div>
               <div>
                 <Label>{t("Phone Number")}</Label>
@@ -2553,16 +2587,27 @@ export default function ChildrenManagement() {
                 <Input
                   type="date"
                   value={formState.dateOfBirth}
-                  onChange={(e) => setFormState({ ...formState, dateOfBirth: e.target.value })}
+                  onChange={(e) => {
+                    setFormState({ ...formState, dateOfBirth: e.target.value });
+                    if (formErrors.dateOfBirth) setFormErrors({ ...formErrors, dateOfBirth: "" });
+                  }}
+                  aria-invalid={!!formErrors.dateOfBirth}
+                  className={formErrors.dateOfBirth ? "border-destructive focus-visible:ring-destructive" : ""}
                 />
+                {formErrors.dateOfBirth && (
+                  <p className="text-xs text-destructive mt-1">{formErrors.dateOfBirth}</p>
+                )}
               </div>
               <div>
                 <Label>{t("Gender")} *</Label>
                 <Select
                   value={formState.gender}
-                  onValueChange={(v) => setFormState({ ...formState, gender: v })}
+                  onValueChange={(v) => {
+                    setFormState({ ...formState, gender: v });
+                    if (formErrors.gender) setFormErrors({ ...formErrors, gender: "" });
+                  }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={formErrors.gender ? "border-destructive focus-visible:ring-destructive" : ""}>
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2570,14 +2615,20 @@ export default function ChildrenManagement() {
                     <SelectItem value="FEMALE">Female</SelectItem>
                   </SelectContent>
                 </Select>
+                {formErrors.gender && (
+                  <p className="text-xs text-destructive mt-1">{formErrors.gender}</p>
+                )}
               </div>
               <div>
                 <Label>{t("Father")} *</Label>
                 <Select
                   value={formState.fatherId}
-                  onValueChange={(v) => setFormState({ ...formState, fatherId: v })}
+                  onValueChange={(v) => {
+                    setFormState({ ...formState, fatherId: v });
+                    if (formErrors.fatherId) setFormErrors({ ...formErrors, fatherId: "" });
+                  }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={formErrors.fatherId ? "border-destructive focus-visible:ring-destructive" : ""}>
                     <SelectValue placeholder="Select father" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2595,6 +2646,9 @@ export default function ChildrenManagement() {
                     )}
                   </SelectContent>
                 </Select>
+                {formErrors.fatherId && (
+                  <p className="text-xs text-destructive mt-1">{formErrors.fatherId}</p>
+                )}
               </div>
             </div>
             <DialogFooter>
@@ -2728,7 +2782,7 @@ export default function ChildrenManagement() {
 
         {/* Generate ID Card Dialog */}
         <Dialog open={isIdCardDialogOpen} onOpenChange={setIsIdCardDialogOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <IdCard className="h-5 w-5 text-primary" /> {t("Generate ID Card")}
@@ -2761,45 +2815,100 @@ export default function ChildrenManagement() {
                 </div>
 
                 {/* Printable ID Card */}
-                <div className="flex justify-center bg-muted/40 p-4 rounded-lg">
+                <div className="flex justify-center bg-muted/40 p-4 rounded-lg overflow-x-auto">
                   <div
                     ref={idCardRef}
-                    className="w-[260px] bg-white rounded-xl overflow-hidden border shadow-md"
+                    className="w-[560px] shrink-0 bg-white rounded-xl overflow-hidden border shadow-md font-sans"
                   >
-                    <div className="bg-blue-800 text-white text-center py-2 px-2">
-                      <p className="text-[10px] font-semibold leading-tight">
-                        {t("Ethiopian Orthodox Tewahido Church")}
-                      </p>
-                      <p className="text-[9px] opacity-90">
-                        {(idCardChild as any).churchName || t("Church Membership ID")}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-center py-3">
-                      {idCardPhoto ? (
-                        <img
-                          src={idCardPhoto}
-                          alt="member"
-                          className="h-24 w-24 rounded-md object-cover border-2 border-blue-800"
-                        />
-                      ) : (
-                        <div className="h-24 w-24 rounded-md border-2 border-dashed border-blue-800 flex items-center justify-center text-[10px] text-muted-foreground text-center px-2">
-                          {t("No photo uploaded")}
-                        </div>
-                      )}
-                      <p className="mt-2 font-bold text-sm text-center px-2">
-                        {idCardChild.fullName ||
-                          `${idCardChild.firstName || ""} ${idCardChild.middleName || ""} ${idCardChild.lastName || ""}`.trim()}
-                      </p>
-                      <Badge className="mt-1 bg-blue-100 text-blue-800">
-                        {t("Member")}
-                      </Badge>
+                    {/* Header */}
+                    <div className="bg-[#4d8f96] text-white px-4 py-3 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold leading-snug">
+                          {(idCardChild as any).churchName || t("Church Membership Card")}
+                        </p>
+                        <p className="text-xs opacity-95 mt-1">
+                          {t("Sunday School Members Identification Card")}
+                        </p>
+                      </div>
                       <img
-                        src={getIdCardQrUrl(idCardChild)}
-                        alt="QR code"
-                        className="h-24 w-24 mt-3"
+                        src="/church-logo.png"
+                        alt="Church logo"
+                        className="h-14 w-14 rounded-full object-cover border-2 border-white shrink-0"
                       />
-                      <p className="mt-2 text-xs font-semibold">
-                        ID: {(idCardChild as any).sebekaMemberId || idCardChild.id}
+                    </div>
+
+                    {/* Body */}
+                    <div className="relative flex px-4 py-4 gap-4">
+                      {/* QR code */}
+                      <div className="flex flex-col items-center gap-1 shrink-0">
+                        <img
+                          src={getIdCardQrUrl(idCardChild)}
+                          alt="QR code"
+                          className="h-[130px] w-[130px] border"
+                        />
+                        <p className="text-[10px] text-muted-foreground">
+                          {t("Validity")}: {new Date().getFullYear()}
+                        </p>
+                      </div>
+
+                      {/* Fields */}
+                      <div className="flex-1 space-y-1.5 text-sm pr-24">
+                        <p>
+                          <span className="font-semibold">{t("Name")}: </span>
+                          {idCardChild.fullName ||
+                            `${idCardChild.firstName || ""} ${idCardChild.middleName || ""} ${idCardChild.lastName || ""}`.trim()}
+                        </p>
+                        {(idCardChild as any).christianName && (
+                          <p>
+                            <span className="font-semibold">{t("Christian Name")}: </span>
+                            {(idCardChild as any).christianName}
+                          </p>
+                        )}
+                        <p>
+                          <span className="font-semibold">{t("Date of Birth")}: </span>
+                          {idCardChild.dateOfBirth
+                            ? new Date(idCardChild.dateOfBirth).toLocaleDateString()
+                            : "-"}
+                        </p>
+                        <p>
+                          <span className="font-semibold">{t("Guardian Name")}: </span>
+                          {idCardChild.fatherName || "-"}
+                        </p>
+                        <p>
+                          <span className="font-semibold">{t("Phone")}: </span>
+                          {idCardChild.phoneNumber || "-"}
+                        </p>
+                      </div>
+
+                      {/* Photo, top-right ID number */}
+                      <div className="absolute top-4 right-4 flex flex-col items-center gap-1">
+                        <p className="text-[10px] font-semibold text-muted-foreground">
+                          {t("ID No")}: {(idCardChild as any).sebekaMemberId || idCardChild.id}
+                        </p>
+                        {idCardPhoto ? (
+                          <img
+                            src={idCardPhoto}
+                            alt="member"
+                            className="h-20 w-20 rounded-sm object-cover border-2 border-[#4d8f96]"
+                          />
+                        ) : (
+                          <div className="h-20 w-20 rounded-sm border-2 border-dashed border-[#4d8f96] flex items-center justify-center text-[9px] text-muted-foreground text-center px-1">
+                            {t("No photo")}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="bg-[#eef3f6] px-4 py-2 text-center border-t">
+                      <p className="text-xs font-medium">
+                        {t("Contact")}: {(idCardChild as any).contactPhone1 || "-"}
+                        {(idCardChild as any).contactPhone2
+                          ? ` | ${(idCardChild as any).contactPhone2}`
+                          : ""}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {t("This card is the property of the Sunday School and must be returned if lost membership is found.")}
                       </p>
                     </div>
                   </div>

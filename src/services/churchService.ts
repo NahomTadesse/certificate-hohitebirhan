@@ -58,8 +58,11 @@ export interface UpdateChurchPayload {
 }
 
 // GET: List all churches
-export const fetchChurches = async (page = 0, perPage = 100): Promise<ChurchPageResponse> => {
+export const fetchChurches = async (page = 0, perPage = 100, search?: string): Promise<ChurchPageResponse> => {
   let url = `/api/church?page=${page}&per_page=${perPage}`;
+  if (search && search.trim()) {
+    url += `&search=${encodeURIComponent(search.trim())}`;
+  }
   return await authenticatedFetch<ChurchPageResponse>(url);
 };
 

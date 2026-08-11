@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import {
   Cross,
   Plus,
@@ -56,7 +57,6 @@ export default function DeathRecordsManagement() {
   const [records, setRecords] = useState<DeathRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<MemberType | "ALL">("ALL");
 
@@ -91,13 +91,13 @@ export default function DeathRecordsManagement() {
   };
   const [formState, setFormState] = useState(emptyForm);
 
-  const loadRecords = useCallback(async () => {
+  const loadRecords = useCallback(async (search?: string) => {
     setLoading(true);
     setError(null);
     try {
       const data =
         typeFilter === "ALL"
-          ? await fetchDeathRecords()
+          ? await fetchDeathRecords(0, 20, search)
           : await fetchDeathRecordsByMemberType(typeFilter);
       setRecords(data || []);
     } catch (err: any) {
@@ -111,6 +111,22 @@ export default function DeathRecordsManagement() {
   useEffect(() => {
     loadRecords();
   }, [loadRecords]);
+
+  // Debounce the search box, then ask the backend to filter the list
+  // (a local filter below still applies as a fallback in case the API
+  // doesn't yet honor the `search` query param).
+  const isFirstSearchRender = useRef(true);
+  useEffect(() => {
+    if (isFirstSearchRender.current) {
+      isFirstSearchRender.current = false;
+      return;
+    }
+    const handle = setTimeout(() => {
+      loadRecords(searchQuery);
+    }, 400);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
 
   // Load applicable member dropdown whenever member type changes in the form
   useEffect(() => {
@@ -131,11 +147,14 @@ export default function DeathRecordsManagement() {
   }, [formState.memberType, isDialogOpen]);
 
   const filteredRecords = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return records;
     return records.filter(
       (r) =>
-        r.memberName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.registrationNo?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.burialPlace?.toLowerCase().includes(searchQuery.toLowerCase())
+        (r.fullName || r.memberName || "").toLowerCase().includes(query) ||
+        (r.registrationNo || "").toLowerCase().includes(query) ||
+        (r.burialPlace || "").toLowerCase().includes(query) ||
+        (r.sebekaMemberId || "").toLowerCase().includes(query)
     );
   }, [records, searchQuery]);
 
@@ -224,39 +243,37 @@ export default function DeathRecordsManagement() {
 
   const handleVerify = async (record: DeathRecord) => {
     if (!record.registrationNo) {
-      setAlert({ type: "error", message: "No registration number available for this record." });
+      toast.error("No registration number available for this record.");
       return;
     }
     try {
       const res = await verifyDeathRecord(record.registrationNo);
-      setAlert({
-        type: res?.success !== false ? "success" : "error",
-        message: res?.message || "Verification complete.",
-      });
+      if (res?.success !== false) {
+        toast.success(res?.message || "Verification complete.");
+      } else {
+        toast.error(res?.message || "Verification complete.");
+      }
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Verification failed" });
+      toast.error(err.message || "Verification failed");
     } finally {
-      setTimeout(() => setAlert(null), 4000);
     }
   };
 
   const handleSubmit = async () => {
     if (!formState.memberId || !formState.dateOfDeath) {
-      setAlert({ type: "error", message: "Member and date of death are required" });
+      toast.error("Member and date of death are required");
       return;
     }
 
     setIsSubmitting(true);
-    setAlert(null);
 
     try {
       await recordDeath(formState);
-      setAlert({ type: "success", message: "Death record created successfully!" });
+      toast.success("Death record created successfully!");
       await loadRecords();
       setIsDialogOpen(false);
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Operation failed" });
+      toast.error(err.message || "Operation failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -264,17 +281,16 @@ export default function DeathRecordsManagement() {
 
   const handleRevoke = async () => {
     if (!selectedRecord?.registrationNo || !revokeReason) {
-      setAlert({ type: "error", message: "A reason is required to revoke this record." });
+      toast.error("A reason is required to revoke this record.");
       return;
     }
     setIsSubmitting(true);
     try {
       await revokeDeathRecord(selectedRecord.registrationNo, { reason: revokeReason });
-      setAlert({ type: "success", message: "Death record revoked successfully!" });
+      toast.success("Death record revoked successfully!");
       await loadRecords();
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Revocation failed" });
+      toast.error(err.message || "Revocation failed");
     } finally {
       setIsSubmitting(false);
       setIsRevokeDialogOpen(false);
@@ -297,20 +313,6 @@ export default function DeathRecordsManagement() {
             <Plus className="h-5 w-5 mr-2" /> {t("Record Death")}
           </Button>
         </div>
-
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {alert && (
-          <Alert variant={alert.type === "error" ? "destructive" : "default"}>
-            {alert.type === "success" ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-            <AlertDescription>{alert.message}</AlertDescription>
-          </Alert>
-        )}
 
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1 max-w-md">
@@ -337,7 +339,7 @@ export default function DeathRecordsManagement() {
             </SelectContent>
           </Select>
 
-          <Button variant="outline" size="icon" onClick={loadRecords} disabled={loading}>
+          <Button variant="outline" size="icon" onClick={() => loadRecords()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>

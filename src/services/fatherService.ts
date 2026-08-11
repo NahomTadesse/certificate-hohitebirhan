@@ -193,8 +193,46 @@ export interface PaginatedResponse<T> {
 }
 
 // GET: List all fathers (returns paginated response)
-export const fetchFathers = async (): Promise<PaginatedResponse<Father>> => {
-  const response = await authenticatedFetch<PaginatedResponse<Father>>("/api/fathers");
+export const fetchFathers = async (
+  search?: string,
+  page = 0,
+  size = 10,
+  sortBy = "firstName"
+): Promise<PaginatedResponse<Father>> => {
+  // The API does not support a `search` query param on this endpoint -
+  // searching is a separate POST endpoint (see searchFathers below).
+  if (search && search.trim()) {
+    return searchFathers({ name: search.trim() }, page, size);
+  }
+  const response = await authenticatedFetch<PaginatedResponse<Father>>(
+    `/api/fathers?page=${page}&size=${size}&sortBy=${encodeURIComponent(sortBy)}`
+  );
+  return response || { content: [], totalElements: 0, totalPages: 0, empty: true } as PaginatedResponse<Father>;
+};
+
+// Search filters accepted by POST /api/fathers/search
+export interface FatherSearchFilters {
+  name?: string;
+  clericalRank?: string;
+  monasticismType?: string;
+  churchId?: string;
+  dioceseId?: string;
+  isActive?: boolean;
+}
+
+// POST: Search fathers (correct endpoint per swagger - /api/fathers/search is a POST)
+export const searchFathers = async (
+  filters: FatherSearchFilters,
+  page = 0,
+  size = 10
+): Promise<PaginatedResponse<Father>> => {
+  const response = await authenticatedFetch<PaginatedResponse<Father>>(
+    `/api/fathers/search?page=${page}&size=${size}`,
+    {
+      method: "POST",
+      body: JSON.stringify(filters),
+    }
+  );
   return response || { content: [], totalElements: 0, totalPages: 0, empty: true } as PaginatedResponse<Father>;
 };
 
@@ -288,4 +326,11 @@ export const fetchFathersByMonasticism = async (type: string): Promise<Paginated
 export const fetchFathersByDiocese = async (dioceseId: string): Promise<PaginatedResponse<Father>> => {
   const response = await authenticatedFetch<PaginatedResponse<Father>>(`/api/fathers/diocese/${dioceseId}`);
   return response || ({ content: [], totalElements: 0, totalPages: 0, empty: true } as PaginatedResponse<Father>);
+};
+
+// DELETE: Delete an uploaded father document
+export const deleteFatherDocument = async (documentId: string): Promise<any> => {
+  return await authenticatedFetch(`/api/fathers/documents/${documentId}`, {
+    method: "DELETE",
+  });
 };

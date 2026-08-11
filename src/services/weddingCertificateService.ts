@@ -29,6 +29,67 @@ export interface RevokePayload {
   revokedBy?: string;
 }
 
+export interface PaginatedResponse<T = any> {
+  content: T[];
+  totalElements?: number;
+  totalPages?: number;
+  number?: number;
+  size?: number;
+  first?: boolean;
+  last?: boolean;
+  empty?: boolean;
+}
+
+const emptyPage = <T,>(): PaginatedResponse<T> => ({ content: [], totalElements: 0, totalPages: 0, empty: true });
+
+const unwrapPage = <T,>(response: any): PaginatedResponse<T> => {
+  if (response && response.success === true && response.data) {
+    if (Array.isArray(response.data.content)) return response.data as PaginatedResponse<T>;
+    if (Array.isArray(response.data)) return { content: response.data } as PaginatedResponse<T>;
+  }
+  if (Array.isArray(response?.content)) return response as PaginatedResponse<T>;
+  if (Array.isArray(response)) return { content: response } as PaginatedResponse<T>;
+  return emptyPage<T>();
+};
+
+// GET: List all wedding certificates for a church (paginated)
+export const fetchWeddingCertificates = async (
+  churchId: string,
+  page = 0,
+  size = 20
+): Promise<PaginatedResponse> => {
+  const response = await authenticatedFetch<any>(
+    `/api/v1/wedding-certificates?churchId=${encodeURIComponent(churchId)}&page=${page}&size=${size}`
+  );
+  return unwrapPage(response);
+};
+
+// GET: Search wedding certificates by keyword within a church
+export const searchWeddingCertificates = async (
+  churchId: string,
+  keyword: string,
+  page = 0,
+  size = 20
+): Promise<PaginatedResponse> => {
+  const response = await authenticatedFetch<any>(
+    `/api/v1/wedding-certificates/search?churchId=${encodeURIComponent(churchId)}&keyword=${encodeURIComponent(
+      keyword
+    )}&page=${page}&size=${size}`
+  );
+  return unwrapPage(response);
+};
+
+// GET: List all wedding certificates across all churches (super admin)
+export const fetchAllWeddingCertificatesForAdmin = async (
+  page = 0,
+  size = 20
+): Promise<PaginatedResponse> => {
+  const response = await authenticatedFetch<any>(
+    `/api/v1/wedding-certificates/admin/all?page=${page}&size=${size}`
+  );
+  return unwrapPage(response);
+};
+
 // POST: Issue a wedding certificate
 export const issueWeddingCertificate = async (
   payload: WeddingCertificatePayload

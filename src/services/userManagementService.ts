@@ -75,12 +75,14 @@ export interface PagedUsers {
 export const fetchAllUsersPaginated = async (
   page = 0,
   size = 10,
-  sort?: string[]
+  sort?: string[],
+  search?: string
 ): Promise<PagedUsers> => {
   const params = new URLSearchParams();
   params.set("page", String(page));
   params.set("size", String(size));
   if (sort) sort.forEach((s) => params.append("sort", s));
+  if (search && search.trim()) params.set("search", search.trim());
   const response = await authenticatedFetch<any>(`/api/v1/user/all/paginated?${params.toString()}`);
   if (response && Array.isArray(response.content)) return response;
   return { content: [], totalPages: 0, totalElements: 0, number: 0, size };

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
+import { toast } from "sonner";
 import {
   Banknote,
   CheckCircle,
@@ -47,7 +48,6 @@ function PaymentsPageWra() {
   const [children, setChildren] = useState<{ id: string; fullName: string }[]>([]);
   const [loadingChildren, setLoadingChildren] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [lastReceipt, setLastReceipt] = useState<null | {
     childName: string;
     rate: number;
@@ -86,12 +86,11 @@ function PaymentsPageWra() {
 
   const handleSubmit = async () => {
     if (!formState.childId || !formState.rate || !formState.months) {
-      setAlert({ type: "error", message: "Please fill in child, rate, and months." });
+      toast.error("Please fill in child, rate, and months.");
       return;
     }
 
     setIsSubmitting(true);
-    setAlert(null);
     try {
       await makePayment({
         childId: formState.childId,
@@ -110,11 +109,10 @@ function PaymentsPageWra() {
         date: new Date().toLocaleString(),
       });
 
-      setAlert({ type: "success", message: "Payment recorded successfully!" });
+      toast.success("Payment recorded successfully!");
       setFormState({ childId: "", rate: "", type: "MONTHLY", months: "1" });
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Payment failed" });
+      toast.error(err.message || "Payment failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -132,7 +130,7 @@ function PaymentsPageWra() {
       const data = await fetchPaymentHistory(historyChildId);
       setHistory(data || []);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Failed to load payment history" });
+      toast.error(err.message || "Failed to load payment history");
     } finally {
       setLoadingHistory(false);
     }
@@ -145,18 +143,17 @@ function PaymentsPageWra() {
 
   const handleWaive = async () => {
     if (!waiveChildId || !waiveReason) {
-      setAlert({ type: "error", message: "Select a child and provide a reason to waive the fee." });
+      toast.error("Select a child and provide a reason to waive the fee.");
       return;
     }
     setIsWaiving(true);
     try {
       await waiveCertificateFee(waiveChildId, waiveReason);
-      setAlert({ type: "success", message: "Certificate fee waived successfully!" });
+      toast.success("Certificate fee waived successfully!");
       setWaiveChildId("");
       setWaiveReason("");
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Failed to waive fee" });
+      toast.error(err.message || "Failed to waive fee");
     } finally {
       setIsWaiving(false);
     }
@@ -171,7 +168,7 @@ function PaymentsPageWra() {
 
   const handleLoadReport = async () => {
     if (!reportStart || !reportEnd) {
-      setAlert({ type: "error", message: "Select a start and end date for the report." });
+      toast.error("Select a start and end date for the report.");
       return;
     }
     setLoadingReport(true);
@@ -179,7 +176,7 @@ function PaymentsPageWra() {
       const data = await fetchPaymentsReport(reportType, reportStart, reportEnd);
       setReport(data || []);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Failed to load report" });
+      toast.error(err.message || "Failed to load report");
     } finally {
       setLoadingReport(false);
     }
@@ -194,13 +191,6 @@ function PaymentsPageWra() {
           </h1>
           <p className="text-muted-foreground">{t("Record membership payments for children")}</p>
         </div>
-
-        {alert && (
-          <Alert variant={alert.type === "error" ? "destructive" : "default"}>
-            {alert.type === "success" ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-            <AlertDescription>{alert.message}</AlertDescription>
-          </Alert>
-        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2">

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import { Users, Search, RefreshCw, AlertCircle, CheckCircle, XCircle, Edit, Plus } from "lucide-react";
 
 import { ColumnDef } from "@tanstack/react-table";
@@ -58,7 +59,6 @@ export default function UsersManagement() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -86,11 +86,11 @@ export default function UsersManagement() {
     password: "",
   });
 
-  const loadUsers = useCallback(async () => {
+  const loadUsers = useCallback(async (search?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchAllUsersPaginated(page, 10);
+      const data = await fetchAllUsersPaginated(page, 10, undefined, search);
       setUsers(data.content || []);
       setTotalPages(data.totalPages || 0);
     } catch (err: any) {
@@ -105,13 +105,30 @@ export default function UsersManagement() {
     loadUsers();
   }, [loadUsers]);
 
+  // Debounce the search box, then ask the backend to filter the list
+  // (a local filter below still applies as a fallback in case the API
+  // doesn't yet honor the `search` query param).
+  const isFirstSearchRender = useRef(true);
+  useEffect(() => {
+    if (isFirstSearchRender.current) {
+      isFirstSearchRender.current = false;
+      return;
+    }
+    const handle = setTimeout(() => {
+      loadUsers(searchQuery);
+    }, 400);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
+
   const filteredUsers = useMemo(() => {
+    const query = searchQuery.toLowerCase();
     return users.filter(
       (u) =>
-        u.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        u.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        u.firstname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        u.lastname?.toLowerCase().includes(searchQuery.toLowerCase())
+        (u.userName || "").toLowerCase().includes(query) ||
+        (u.email || "").toLowerCase().includes(query) ||
+        (u.firstname || "").toLowerCase().includes(query) ||
+        (u.lastname || "").toLowerCase().includes(query)
     );
   }, [users, searchQuery]);
 
@@ -205,10 +222,10 @@ export default function UsersManagement() {
           role: formState.role,
           status: formState.status,
         });
-        setAlert({ type: "success", message: "User updated successfully!" });
+        toast.success("User updated successfully!");
       } else {
         if (!formState.userName || !formState.password) {
-          setAlert({ type: "error", message: "Username and password are required" });
+          toast.error("Username and password are required");
           setIsSubmitting(false);
           return;
         }
@@ -222,13 +239,12 @@ export default function UsersManagement() {
           status: formState.status,
           password: formState.password,
         });
-        setAlert({ type: "success", message: "User created successfully!" });
+        toast.success("User created successfully!");
       }
       await loadUsers();
       setIsDialogOpen(false);
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Operation failed" });
+      toast.error(err.message || "Operation failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -249,20 +265,6 @@ export default function UsersManagement() {
           </Button>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {alert && (
-          <Alert variant={alert.type === "error" ? "destructive" : "default"}>
-            {alert.type === "success" ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-            <AlertDescription>{alert.message}</AlertDescription>
-          </Alert>
-        )}
-
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -273,7 +275,7 @@ export default function UsersManagement() {
               className="pl-10"
             />
           </div>
-          <Button variant="outline" size="icon" onClick={loadUsers} disabled={loading}>
+          <Button variant="outline" size="icon" onClick={() => loadUsers()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>

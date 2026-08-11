@@ -8,6 +8,8 @@ export interface DeathRecord {
   memberType: MemberType;
   memberId: string;
   memberName?: string;
+  fullName?: string;
+  sebekaMemberId?: string;
   occupation?: string;
   rankOrTitle?: string;
   dateOfDeath: string;
@@ -51,11 +53,14 @@ const unwrap = <T,>(response: any, fallback: T): T => {
 // GET: List all death records (paginated)
 export const fetchDeathRecords = async (
   page = 0,
-  size = 20
+  size = 20,
+  search?: string
 ): Promise<DeathRecord[]> => {
-  const response = await authenticatedFetch<any>(
-    `/api/death-records?page=${page}&size=${size}`
-  );
+  let url = `/api/death-records?page=${page}&size=${size}`;
+  if (search && search.trim()) {
+    url += `&search=${encodeURIComponent(search.trim())}`;
+  }
+  const response = await authenticatedFetch<any>(url);
   const data = unwrap<any>(response, []);
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.content)) return data.content;
@@ -81,6 +86,51 @@ export const fetchDeathRecordsByMemberType = async (
   const response = await authenticatedFetch<any>(
     `/api/death-records/type/${memberType}?page=${page}&size=${size}`
   );
+  const data = unwrap<any>(response, []);
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.content)) return data.content;
+  return [];
+};
+
+// GET: Search death records by keyword within a church
+export const searchDeathRecords = async (
+  churchId: string,
+  keyword: string,
+  page = 0,
+  size = 20
+): Promise<DeathRecord[]> => {
+  const response = await authenticatedFetch<any>(
+    `/api/death-records/search?churchId=${encodeURIComponent(churchId)}&keyword=${encodeURIComponent(
+      keyword
+    )}&page=${page}&size=${size}`
+  );
+  const data = unwrap<any>(response, []);
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.content)) return data.content;
+  return [];
+};
+
+// GET: Search death records across all churches (super admin)
+export const searchDeathRecordsForAdmin = async (
+  keyword: string,
+  page = 0,
+  size = 20
+): Promise<DeathRecord[]> => {
+  const response = await authenticatedFetch<any>(
+    `/api/death-records/admin/search?keyword=${encodeURIComponent(keyword)}&page=${page}&size=${size}`
+  );
+  const data = unwrap<any>(response, []);
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.content)) return data.content;
+  return [];
+};
+
+// GET: List all death records across all churches (super admin)
+export const fetchAllDeathRecordsForAdmin = async (
+  page = 0,
+  size = 20
+): Promise<DeathRecord[]> => {
+  const response = await authenticatedFetch<any>(`/api/death-records/admin/all?page=${page}&size=${size}`);
   const data = unwrap<any>(response, []);
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.content)) return data.content;

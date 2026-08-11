@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import {
   Landmark,
   Plus,
@@ -44,7 +45,6 @@ export default function DioceseManagement() {
   const [dioceses, setDioceses] = useState<Diocese[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -60,11 +60,11 @@ export default function DioceseManagement() {
   };
   const [formState, setFormState] = useState(emptyForm);
 
-  const loadDioceses = useCallback(async () => {
+  const loadDioceses = useCallback(async (search?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchDioceses();
+      const data = await fetchDioceses(search);
       setDioceses(data || []);
     } catch (err: any) {
       setError("Failed to load dioceses. " + err.message);
@@ -78,13 +78,30 @@ export default function DioceseManagement() {
     loadDioceses();
   }, [loadDioceses]);
 
+  // Debounce the search box, then ask the backend to filter the list
+  // (a local filter below still applies as a fallback in case the API
+  // doesn't yet honor the `search` query param).
+  const isFirstSearchRender = useRef(true);
+  useEffect(() => {
+    if (isFirstSearchRender.current) {
+      isFirstSearchRender.current = false;
+      return;
+    }
+    const handle = setTimeout(() => {
+      loadDioceses(searchQuery);
+    }, 400);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
+
   const filteredDioceses = useMemo(() => {
+    const query = searchQuery.toLowerCase();
     return dioceses.filter(
       (d) =>
-        d.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.nameEnglish?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.bishopName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.location?.toLowerCase().includes(searchQuery.toLowerCase())
+        (d.name || "").toLowerCase().includes(query) ||
+        (d.nameEnglish || "").toLowerCase().includes(query) ||
+        (d.bishopName || "").toLowerCase().includes(query) ||
+        (d.location || "").toLowerCase().includes(query)
     );
   }, [dioceses, searchQuery]);
 
@@ -183,27 +200,25 @@ export default function DioceseManagement() {
 
   const handleSubmit = async () => {
     if (!formState.name) {
-      setAlert({ type: "error", message: "Diocese name is required" });
+      toast.error("Diocese name is required");
       return;
     }
 
     setIsSubmitting(true);
-    setAlert(null);
 
     try {
       if (selectedDiocese) {
         await updateDiocese(selectedDiocese.id, formState);
-        setAlert({ type: "success", message: "Diocese updated successfully!" });
+        toast.success("Diocese updated successfully!");
       } else {
         await createDiocese(formState);
-        setAlert({ type: "success", message: "Diocese created successfully!" });
+        toast.success("Diocese created successfully!");
       }
 
       await loadDioceses();
       setIsDialogOpen(false);
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Operation failed" });
+      toast.error(err.message || "Operation failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -215,11 +230,10 @@ export default function DioceseManagement() {
     setIsSubmitting(true);
     try {
       await deactivateDiocese(selectedDiocese.id);
-      setAlert({ type: "success", message: "Diocese deactivated successfully!" });
+      toast.success("Diocese deactivated successfully!");
       await loadDioceses();
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Deactivation failed" });
+      toast.error(err.message || "Deactivation failed");
     } finally {
       setIsSubmitting(false);
       setIsDeleteDialogOpen(false);
@@ -239,20 +253,6 @@ export default function DioceseManagement() {
           </Button>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {alert && (
-          <Alert variant={alert.type === "error" ? "destructive" : "default"}>
-            {alert.type === "success" ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-            <AlertDescription>{alert.message}</AlertDescription>
-          </Alert>
-        )}
-
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -263,7 +263,7 @@ export default function DioceseManagement() {
               className="pl-10"
             />
           </div>
-          <Button variant="outline" size="icon" onClick={loadDioceses} disabled={loading}>
+          <Button variant="outline" size="icon" onClick={() => loadDioceses()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>

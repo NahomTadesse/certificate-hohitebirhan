@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import {
   Building,
   Plus,
@@ -65,7 +66,6 @@ export default function ChurchManagement() {
   const [dioceses, setDioceses] = useState<Diocese[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -98,11 +98,11 @@ export default function ChurchManagement() {
     address: defaultAddress,
   });
 
-  const loadChurches = useCallback(async () => {
+  const loadChurches = useCallback(async (search?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchChurches(0, 100);
+      const response = await fetchChurches(0, 100, search);
       setChurches(response.data || []);
     } catch (err: any) {
       setError("Failed to load churches. " + err.message);
@@ -126,11 +126,28 @@ export default function ChurchManagement() {
     loadDioceses();
   }, [loadChurches, loadDioceses]);
 
+  // Debounce the search box, then ask the backend to filter the list
+  // (a local filter below still applies as a fallback in case the API
+  // doesn't yet honor the `search` query param).
+  const isFirstSearchRender = useRef(true);
+  useEffect(() => {
+    if (isFirstSearchRender.current) {
+      isFirstSearchRender.current = false;
+      return;
+    }
+    const handle = setTimeout(() => {
+      loadChurches(searchQuery);
+    }, 400);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
+
   const filteredChurches = useMemo(() => {
+    const query = searchQuery.toLowerCase();
     return churches.filter((church) =>
-      church.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      church.diocese.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (church.address.city && church.address.city.toLowerCase().includes(searchQuery.toLowerCase()))
+      (church.name || "").toLowerCase().includes(query) ||
+      (church.diocese || "").toLowerCase().includes(query) ||
+      (church.address?.city || "").toLowerCase().includes(query)
     );
   }, [churches, searchQuery]);
 
@@ -255,12 +272,11 @@ export default function ChurchManagement() {
 
   const handleSubmit = async () => {
     if (!formState.name || !formState.diocese) {
-      setAlert({ type: "error", message: "Church name and diocese are required fields" });
+      toast.error("Church name and diocese are required fields");
       return;
     }
 
     setIsSubmitting(true);
-    setAlert(null);
 
     try {
       if (selectedChurch) {
@@ -270,17 +286,16 @@ export default function ChurchManagement() {
           address: formState.address,
         };
         await updateChurch(selectedChurch.id, updatePayload);
-        setAlert({ type: "success", message: "Church updated successfully!" });
+        toast.success("Church updated successfully!");
       } else {
         await createChurch(formState);
-        setAlert({ type: "success", message: "Church created successfully!" });
+        toast.success("Church created successfully!");
       }
 
       await loadChurches();
       setIsDialogOpen(false);
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Operation failed" });
+      toast.error(err.message || "Operation failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -292,11 +307,10 @@ export default function ChurchManagement() {
     setIsSubmitting(true);
     try {
       await deactivateChurch(selectedChurch.id);
-      setAlert({ type: "success", message: "Church deactivated successfully!" });
+      toast.success("Church deactivated successfully!");
       await loadChurches();
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Deactivation failed" });
+      toast.error(err.message || "Deactivation failed");
     } finally {
       setIsSubmitting(false);
       setIsDeleteDialogOpen(false);
@@ -326,20 +340,6 @@ export default function ChurchManagement() {
           </Button>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {alert && (
-          <Alert variant={alert.type === "error" ? "destructive" : "default"}>
-            {alert.type === "success" ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-            <AlertDescription>{alert.message}</AlertDescription>
-          </Alert>
-        )}
-
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -350,7 +350,7 @@ export default function ChurchManagement() {
               className="pl-10"
             />
           </div>
-          <Button variant="outline" size="icon" onClick={loadChurches} disabled={loading}>
+          <Button variant="outline" size="icon" onClick={() => loadChurches()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>

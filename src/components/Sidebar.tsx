@@ -136,7 +136,11 @@ const baseMenu: MenuSection[] = [
         label: "Certificates",
         icon: FileText,
         path: "certificates",
-        subMenu: [{ label: "Generate Certificate", path: "certificates", type: "view" }],
+        subMenu: [
+          { label: "Generate Certificate", path: "certificates", type: "view" },
+          { label: "Baptism / Birth Certificates", path: "baptism-certificates", type: "view" },
+          { label: "Wedding Certificates", path: "wedding-certificates", type: "view" },
+        ],
       },
       {
         label: "Death Records",

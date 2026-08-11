@@ -1375,7 +1375,8 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import {
   Users,
   Plus,
@@ -1497,7 +1498,6 @@ export default function FatherManagement() {
   const [dioceses, setDioceses] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [rankFilter, setRankFilter] = useState("ALL");
@@ -1551,12 +1551,12 @@ export default function FatherManagement() {
     educationList: [defaultEducation],
   });
 
-const loadData = useCallback(async () => {
+const loadData = useCallback(async (search?: string) => {
   setLoading(true);
   setError(null);
   try {
     const [fathersData, churchesData, diocesesData] = await Promise.all([
-      fetchFathers(),
+      fetchFathers(search),
       fetchChurchesForDropdown(),
       fetchDiocesesForDropdown(),
     ]);
@@ -1594,6 +1594,22 @@ const loadData = useCallback(async () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Debounce the search box, then ask the backend to filter the list
+  // (a local filter below still applies as a fallback in case the API
+  // doesn't yet honor the `search` query param).
+  const isFirstSearchRender = useRef(true);
+  useEffect(() => {
+    if (isFirstSearchRender.current) {
+      isFirstSearchRender.current = false;
+      return;
+    }
+    const handle = setTimeout(() => {
+      loadData(searchQuery);
+    }, 400);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
 
   const normalizeFatherPage = (data: any) => {
     if (!data) return [];
@@ -1818,17 +1834,16 @@ const loadData = useCallback(async () => {
 
   const handleTransfer = async () => {
     if (!selectedFather || !transferChurchId) {
-      setAlert({ type: "error", message: "Please select a destination church." });
+      toast.error("Please select a destination church.");
       return;
     }
     setIsSubmitting(true);
     try {
       await transferFather(selectedFather.id, transferChurchId);
-      setAlert({ type: "success", message: "Father transferred successfully!" });
+      toast.success("Father transferred successfully!");
       await applyFilters(rankFilter, monasticismFilter);
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Transfer failed" });
+      toast.error(err.message || "Transfer failed");
     } finally {
       setIsSubmitting(false);
       setIsTransferDialogOpen(false);
@@ -1840,11 +1855,10 @@ const loadData = useCallback(async () => {
     setIsSubmitting(true);
     try {
       await deactivateFather(selectedFather.id);
-      setAlert({ type: "success", message: "Father deactivated successfully!" });
+      toast.success("Father deactivated successfully!");
       await applyFilters(rankFilter, monasticismFilter);
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Deactivation failed" });
+      toast.error(err.message || "Deactivation failed");
     } finally {
       setIsSubmitting(false);
       setIsDeactivateDialogOpen(false);
@@ -1913,21 +1927,19 @@ const loadData = useCallback(async () => {
 
   const handleSubmit = async () => {
     if (!formState.firstName || !formState.lastName || !formState.churchId) {
-      setAlert({ type: "error", message: "Please fill all required fields" });
+      toast.error("Please fill all required fields");
       return;
     }
 
     setIsSubmitting(true);
-    setAlert(null);
 
     try {
       await createFather(formState);
-      setAlert({ type: "success", message: "Father registered successfully!" });
+      toast.success("Father registered successfully!");
       await loadData();
       setIsDialogOpen(false);
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Operation failed" });
+      toast.error(err.message || "Operation failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -1939,11 +1951,10 @@ const loadData = useCallback(async () => {
     setIsSubmitting(true);
     try {
       await deleteFather(selectedFather.id);
-      setAlert({ type: "success", message: "Father deleted successfully!" });
+      toast.success("Father deleted successfully!");
       await loadData();
-      setTimeout(() => setAlert(null), 3000);
     } catch (err: any) {
-      setAlert({ type: "error", message: err.message || "Delete failed" });
+      toast.error(err.message || "Delete failed");
     } finally {
       setIsSubmitting(false);
       setIsDeleteDialogOpen(false);
@@ -1974,20 +1985,6 @@ const loadData = useCallback(async () => {
             <Plus className="h-5 w-5 mr-2" /> {t("Add Father")}
           </Button>
         </div>
-
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {alert && (
-          <Alert variant={alert.type === "error" ? "destructive" : "default"}>
-            {alert.type === "success" ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-            <AlertDescription>{alert.message}</AlertDescription>
-          </Alert>
-        )}
 
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1 max-w-md">

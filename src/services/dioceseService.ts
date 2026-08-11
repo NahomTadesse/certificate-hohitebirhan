@@ -23,10 +23,15 @@ export interface BaseResponse<T = any> {
 }
 
 // GET: List all dioceses
-export const fetchDioceses = async (): Promise<Diocese[]> => {
-  const response = await authenticatedFetch<any>("/api/v1/dioceses");
+export const fetchDioceses = async (search?: string): Promise<Diocese[]> => {
+  const query = search && search.trim() ? `?search=${encodeURIComponent(search.trim())}` : "";
+  const response = await authenticatedFetch<any>(`/api/v1/dioceses${query}`);
   if (Array.isArray(response)) return response;
-  if (response && Array.isArray(response.data)) return response.data;
+  if (response && response.data) {
+    if (Array.isArray(response.data)) return response.data;
+    if (Array.isArray(response.data.content)) return response.data.content;
+  }
+  if (Array.isArray(response?.content)) return response.content;
   return [];
 };
 
