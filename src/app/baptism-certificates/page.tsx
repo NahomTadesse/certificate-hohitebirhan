@@ -501,8 +501,8 @@ export default function BaptismCertificatesManagement() {
         </Dialog>
 
         {/* Revoke Dialog */}
-        <Dialog open={isRevokeDialogOpen} onOpenChange={setIsRevokeDialogOpen}>
-          <DialogContent>
+        <Dialog  open={isRevokeDialogOpen} onOpenChange={setIsRevokeDialogOpen}>
+          <DialogContent className="max-w-200">
             <DialogHeader>
               <DialogTitle>{t("Revoke Baptism Certificate?")}</DialogTitle>
             </DialogHeader>

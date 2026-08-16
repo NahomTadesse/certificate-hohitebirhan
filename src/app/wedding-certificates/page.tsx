@@ -527,7 +527,7 @@ export default function WeddingCertificatesManagement() {
 
         {/* Revoke Dialog */}
         <Dialog open={isRevokeDialogOpen} onOpenChange={setIsRevokeDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-200">
             <DialogHeader>
               <DialogTitle>{t("Revoke Wedding Certificate?")}</DialogTitle>
             </DialogHeader>
