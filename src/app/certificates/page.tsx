@@ -56,8 +56,8 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 // Unified brand color for certificates - a deep blue-green (teal) mix
-const CERT_COLOR = "#0d5c63";
-const CERT_COLOR_DARK = "#0a4a50";
+const CERT_COLOR = "#6bb1f7";
+const CERT_COLOR_DARK = "#6bb1f7";
 
 // Only types that have a real issuing endpoint in the API are offered.
 type CertificateType = "BAPTISM" | "WEDDING" | "DEATH";
@@ -541,13 +541,13 @@ function CertificatesPageWr() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2" style={{ color: CERT_COLOR_DARK }}>
+            <CardTitle className="flex items-center gap-2" >
               <FileText className="h-5 w-5" style={{ color: CERT_COLOR }} /> {t("Certificate Records")}
             </CardTitle>
             <CardDescription>{t("Browse issued baptism, wedding, and death certificates")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 text-primary">
               {(
                 [
                   { value: "BAPTISM", label: "Baptism", icon: Droplets },
@@ -564,8 +564,8 @@ function CertificatesPageWr() {
                     className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors"
                     style={
                       active
-                        ? { backgroundColor: CERT_COLOR, borderColor: CERT_COLOR, color: "white" }
-                        : { borderColor: "#cbd5e1", color: CERT_COLOR_DARK }
+                        ? { backgroundColor:"#1a365d", borderColor: "#1a365d", color: "white" }
+                        : { borderColor: "#cbd5e1", color: "#1a365d "}
                     }
                   >
                     <TabIcon className="h-4 w-4" />
@@ -593,7 +593,7 @@ function CertificatesPageWr() {
                   <Link
                     href={recordTab === "BAPTISM" ? "/baptism-certificates" : "/wedding-certificates"}
                     className="text-sm font-medium underline whitespace-nowrap"
-                    style={{ color: CERT_COLOR }}
+                    style={{ color: "#1a365d" }}
                   >
                     {t("Open full page")}
                   </Link>
@@ -603,7 +603,7 @@ function CertificatesPageWr() {
                 <Link
                   href="/death-records"
                   className="ml-auto text-sm font-medium underline whitespace-nowrap"
-                  style={{ color: CERT_COLOR }}
+                  style={{ color: "#1a365d" }}
                 >
                   {t("Open full page")}
                 </Link>
@@ -615,29 +615,29 @@ function CertificatesPageWr() {
                 <thead style={{ backgroundColor: "#e6f3f2" }}>
                   {recordTab === "BAPTISM" && (
                     <tr>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Registration No.")}</th>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Proper Name")}</th>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Christian Name")}</th>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Date of Baptism")}</th>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Church")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Registration No.")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Proper Name")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Christian Name")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Date of Baptism")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Church")}</th>
                     </tr>
                   )}
                   {recordTab === "WEDDING" && (
                     <tr>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Registration No.")}</th>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Groom")}</th>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Bride")}</th>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Date of Marriage")}</th>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Church")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Registration No.")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Groom")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Bride")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Date of Marriage")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Church")}</th>
                     </tr>
                   )}
                   {recordTab === "DEATH" && (
                     <tr>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Registration No.")}</th>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Member")}</th>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Type")}</th>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Date of Death")}</th>
-                      <th className="text-left px-4 py-2" style={{ color: CERT_COLOR_DARK }}>{t("Burial Place")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Registration No.")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Member")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Type")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Date of Death")}</th>
+                      <th className="text-left px-4 py-2" style={{ color: "#1a365d" }}>{t("Burial Place")}</th>
                     </tr>
                   )}
                 </thead>
@@ -722,7 +722,7 @@ function CertificatesPageWr() {
             </div>
             <div
               id="certificate-preview"
-              className="relative border-4 p-3 bg-[#fdf8ec]"
+              className="relative border-4 p-3 bg-[#fbfcfd]"
               style={{ borderColor: CERT_COLOR }}
             >
               <div className="border-2 p-6" style={{ borderColor: CERT_COLOR }}>
