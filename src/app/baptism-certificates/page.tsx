@@ -304,9 +304,9 @@ export default function BaptismCertificatesManagement() {
               {t("Issue, verify, and manage baptism certificates for children")}
             </p>
           </div>
-          <Button onClick={handleAdd} size="lg" disabled={!churchId} style={{ backgroundColor: CERT_COLOR }}>
+          {/* <Button onClick={handleAdd} size="lg" disabled={!churchId} style={{ backgroundColor: CERT_COLOR }}>
             <Plus className="h-5 w-5 mr-2" /> {t("Issue Certificate")}
-          </Button>
+          </Button> */}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4">

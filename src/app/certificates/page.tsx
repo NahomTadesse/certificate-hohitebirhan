@@ -1,3 +1,5 @@
+
+
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
@@ -6,11 +8,10 @@ import {
   FileText,
   CheckCircle,
   XCircle,
-  Baby,
+  Droplets,
   Cross,
   HeartHandshake,
   Award,
-  Droplets,
   ShieldCheck,
 } from "lucide-react";
 
@@ -28,37 +29,43 @@ import {
 } from "@/components/ui/select";
 
 import DashboardLayout from "../dashboard/layout";
-import { generateCertificate, CertificateType, checkCertificateEligibility } from "@/services/certificateService";
 import {
+  issueBaptismCertificate,
   verifyBaptismCertificate,
   fetchBaptismCertificates,
+  BaptismCertificateRequestDTO,
 } from "@/services/baptismCertificateService";
 import {
+  issueWeddingCertificate,
   verifyWeddingCertificate,
   fetchWeddingCertificates,
+  WeddingCertificateRequestDTO,
 } from "@/services/weddingCertificateService";
-import { verifyDeathRecord, fetchDeathRecords, DeathRecord } from "@/services/deathRecordService";
+import {
+  recordDeath,
+  verifyDeathRecord,
+  fetchDeathRecords,
+  DeathRecord,
+  DeathRecordRequestDTO,
+} from "@/services/deathRecordService";
 import { fetchChildrenForDropdown } from "@/services/childrenService";
 import { fetchChurchesForDropdown } from "@/services/churchService";
+import { fetchFathersForDropdown } from "@/services/fatherService";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 // Unified brand color for certificates - a deep blue-green (teal) mix
-const CERT_COLOR = "#0d5c63"; // dark teal: blend of blue + green
+const CERT_COLOR = "#0d5c63";
 const CERT_COLOR_DARK = "#0a4a50";
+
+// Only types that have a real issuing endpoint in the API are offered.
+type CertificateType = "BAPTISM" | "WEDDING" | "DEATH";
 
 const certificateOptions: { value: CertificateType; label: string; icon: any; color: string }[] = [
   { value: "BAPTISM", label: "Baptism Certificate", icon: Droplets, color: "text-teal-700 bg-teal-100" },
-  { value: "BIRTH", label: "Birth Certificate", icon: Baby, color: "text-teal-700 bg-teal-100" },
-  { value: "DEATH", label: "Death Certificate", icon: Cross, color: "text-cyan-800 bg-cyan-100" },
   { value: "WEDDING", label: "Wedding Certificate", icon: HeartHandshake, color: "text-teal-700 bg-teal-100" },
-];
-
-const verifiableTypes: { value: "BAPTISM" | "WEDDING" | "DEATH"; label: string }[] = [
-  { value: "BAPTISM", label: "Baptism Certificate" },
-  { value: "WEDDING", label: "Wedding Certificate" },
-  { value: "DEATH", label: "Death Record" },
+  { value: "DEATH", label: "Death Certificate", icon: Cross, color: "text-cyan-800 bg-cyan-100" },
 ];
 
 function CertificatesPageWr() {
@@ -68,14 +75,46 @@ function CertificatesPageWr() {
   const [children, setChildren] = useState<{ id: string; fullName: string }[]>([]);
   const [loadingChildren, setLoadingChildren] = useState(true);
   const [childId, setChildId] = useState(searchParams?.get("childId") || "");
-  const [type, setType] = useState<CertificateType>("BIRTH");
+  const [type, setType] = useState<CertificateType>("BAPTISM");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generatedCert, setGeneratedCert] = useState<{
     type: CertificateType;
-    childName: string;
-    certId: string;
-    date: string;
+    data: any; // raw response payload from the issue endpoint (fields differ per type)
   } | null>(null);
+
+  // --- Churches dropdown (shared by the generate form and the records browser) ---
+  const [churches, setChurches] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await fetchChurchesForDropdown();
+        setChurches(data || []);
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
+
+  // --- Fathers dropdown (for the priest / officiant field) ---
+  const [fathers, setFathers] = useState<{ id: string; fullName: string; churchName?: string }[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await fetchFathersForDropdown();
+        setFathers(data || []);
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
+
+  // --- Per-type issue form fields (only the ones each controller needs) ---
+  const [dateOfEvent, setDateOfEvent] = useState(""); // baptism date / marriage date / death date
+  const [church, setChurch] = useState(""); // church name, sent as-is to the DTO
+  const [officiantId, setOfficiantId] = useState(""); // selected father's id
+  const [brideChildId, setBrideChildId] = useState(""); // WEDDING only, groom = childId
+  const [burialPlace, setBurialPlace] = useState(""); // DEATH only
+  const [deathMemberType, setDeathMemberType] = useState<"CHILD" | "FAMILY_HEAD" | "CLERGY">("CHILD");
 
   const loadChildren = useCallback(async () => {
     setLoadingChildren(true);
@@ -93,24 +132,70 @@ function CertificatesPageWr() {
     loadChildren();
   }, [loadChildren]);
 
+  const nameOf = (id: string) => children.find((c) => c.id === id)?.fullName || "Unknown";
+
   const handleGenerate = async () => {
     if (!childId) {
-      toast.error("Please select a child.");
+      toast.error(t("Please select a child."));
       return;
     }
+    if (!dateOfEvent) {
+      toast.error(t("Please select a date."));
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await generateCertificate(childId, type);
-      const childName = children.find((c) => c.id === childId)?.fullName || "Unknown";
-      setGeneratedCert({
-        type,
-        childName,
-        certId: `HC-${type.slice(0, 3)}-${Math.floor(100000 + Math.random() * 899999)}`,
-        date: new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }),
-      });
-      toast.success("Certificate generated successfully!");
+      const childName = nameOf(childId);
+      const officiantName = fathers.find((f) => f.id === officiantId)?.fullName || "";
+      let issued: any = null;
+
+      if (type === "BAPTISM") {
+        const payload: BaptismCertificateRequestDTO = {
+          properName: childName.split(" ")[0],
+          familyName: childName.split(" ").slice(-1)[0],
+          dateOfBaptism: dateOfEvent,
+          church,
+          baptizingPriestId: officiantId || undefined,
+          baptizingPriestName: officiantName,
+        };
+        const res = await issueBaptismCertificate(childId, payload);
+        issued = res?.data;
+      } else if (type === "WEDDING") {
+        if (!brideChildId) {
+          toast.error(t("Please select the bride/groom's counterpart."));
+          setIsSubmitting(false);
+          return;
+        }
+        const payload: WeddingCertificateRequestDTO = {
+          groomChildId: childId,
+          groomFullName: childName,
+          brideChildId,
+          brideFullName: nameOf(brideChildId),
+          church,
+          officiatingPriestId: officiantId || undefined,
+          officiatingPriestName: officiantName,
+          dateOfMarriage: dateOfEvent,
+        };
+        const res = await issueWeddingCertificate(payload);
+        issued = res?.data;
+      } else {
+        const payload: DeathRecordRequestDTO = {
+          memberType: deathMemberType,
+          memberId: childId,
+          dateOfDeath: dateOfEvent,
+          burialPlace,
+          officiant: officiantName,
+        };
+        const res = await recordDeath(payload);
+        issued = res?.data;
+      }
+
+      setGeneratedCert({ type, data: issued || {} });
+      toast.success(t("Certificate generated successfully!"));
+      loadRecords();
     } catch (err: any) {
-      toast.error(err.message || "Certificate generation failed");
+      toast.error(err.message || t("Certificate generation failed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -120,22 +205,8 @@ function CertificatesPageWr() {
     window.print();
   };
 
-  const [eligibility, setEligibility] = useState<string | null>(null);
-  const handleCheckEligibility = async () => {
-    if (!childId) {
-      toast.error("Please select a child first.");
-      return;
-    }
-    try {
-      const res = await checkCertificateEligibility(childId);
-      setEligibility(res?.message || (res?.success ? "Eligible" : "Not eligible"));
-    } catch (err: any) {
-      setEligibility(err.message || "Could not determine eligibility");
-    }
-  };
-
   // --- Verification tool ---
-  const [verifyType, setVerifyType] = useState<"BAPTISM" | "WEDDING" | "DEATH">("BAPTISM");
+  const [verifyType, setVerifyType] = useState<CertificateType>("BAPTISM");
   const [verifyRegNo, setVerifyRegNo] = useState("");
   const [verifyResult, setVerifyResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [verifying, setVerifying] = useState(false);
@@ -149,35 +220,27 @@ function CertificatesPageWr() {
       if (verifyType === "BAPTISM") res = await verifyBaptismCertificate(verifyRegNo);
       else if (verifyType === "WEDDING") res = await verifyWeddingCertificate(verifyRegNo);
       else res = await verifyDeathRecord(verifyRegNo);
-      setVerifyResult({ ok: res?.success !== false, message: res?.message || "Verification complete." });
+      setVerifyResult({ ok: res?.success !== false, message: res?.message || t("Verification complete.") });
     } catch (err: any) {
-      setVerifyResult({ ok: false, message: err.message || "Verification failed." });
+      setVerifyResult({ ok: false, message: err.message || t("Verification failed.") });
     } finally {
       setVerifying(false);
     }
   };
 
-  // --- Certificate records list (Baptism/Birth, Wedding, Death) ---
-  type RecordTab = "BAPTISM" | "WEDDING" | "DEATH";
+  // --- Certificate records list (Baptism, Wedding, Death) ---
+  type RecordTab = CertificateType;
   const [recordTab, setRecordTab] = useState<RecordTab>("BAPTISM");
-  const [churches, setChurches] = useState<{ id: string; name: string }[]>([]);
   const [recordsChurchId, setRecordsChurchId] = useState("");
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [baptismRecords, setBaptismRecords] = useState<any[]>([]);
   const [weddingRecords, setWeddingRecords] = useState<any[]>([]);
   const [deathRecords, setDeathRecords] = useState<DeathRecord[]>([]);
 
+  // Default the records-browser church filter once the shared church list loads
   useEffect(() => {
-    (async () => {
-      try {
-        const data = await fetchChurchesForDropdown();
-        setChurches(data || []);
-        if (data && data.length > 0) setRecordsChurchId((prev) => prev || data[0].id);
-      } catch {
-        // ignore
-      }
-    })();
-  }, []);
+    if (churches.length > 0) setRecordsChurchId((prev) => prev || churches[0].id);
+  }, [churches]);
 
   const loadRecords = useCallback(async () => {
     setLoadingRecords(true);
@@ -195,7 +258,7 @@ function CertificatesPageWr() {
         }
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to load certificate records");
+      toast.error(err.message || t("Failed to load certificate records"));
     } finally {
       setLoadingRecords(false);
     }
@@ -204,6 +267,85 @@ function CertificatesPageWr() {
   useEffect(() => {
     loadRecords();
   }, [loadRecords]);
+
+  const fmtDate = (d?: string) =>
+    d ? new Date(d).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "";
+
+  // Builds the printable field rows straight from the raw API response for each type.
+  const getCertificateFields = (): { am: string; en: string; value: string }[] => {
+    if (!generatedCert) return [];
+    const d = generatedCert.data || {};
+    if (generatedCert.type === "BAPTISM") {
+      return [
+        { am: "የቤተሰብ ስም", en: "Family Name", value: d.familyName },
+        { am: "የግል ስም", en: "Proper Name", value: d.properName },
+        { am: "የተጠመቀው(ችው) ክርስትና ስም", en: "Christian Name", value: d.christianName },
+        { am: "የአባት ስም", en: "Father's Name", value: d.fatherName },
+        { am: "የእናት ስም", en: "Mother's Name", value: d.motherName },
+        { am: "የክርስትና አባት (እናት) ስም", en: "God Father's or Mothers' Name", value: d.godParentName },
+        { am: "ሀገር", en: "Country", value: d.country },
+        { am: "የተወለደበት(ችበት) ቦታ", en: "Place of Birth", value: d.placeOfBirth },
+        { am: "የትውልድ ሀገር", en: "Nationality", value: d.nationality },
+        { am: "የተወለደበት(ችበት) ቀን", en: "Date of Birth", value: fmtDate(d.dateOfBirth) },
+        { am: "የተጠመቀበት(ችበት) ቀን", en: "Date of Baptism", value: fmtDate(d.dateOfBaptism) },
+        { am: "የተጠመቀበት(ችበት) ቤተ ክርስቲያን", en: "Church", value: d.church },
+        { am: "ዜግነት", en: "Citizenship", value: d.citizenship },
+        { am: "አጥማቂው ካህን", en: "Baptizing Priest", value: d.baptizingPriestName },
+      ].map((f) => ({ ...f, value: f.value || "" }));
+    }
+    if (generatedCert.type === "WEDDING") {
+      return [
+        { am: "የሙሽራው ስም", en: "Groom's Name", value: d.groomFullName },
+        { am: "የሙሽራው ዜግነት", en: "Groom's Nationality", value: d.groomNationality },
+        { am: "የሙሽሪት ስም", en: "Bride's Name", value: d.brideFullName },
+        { am: "የሙሽሪት ዜግነት", en: "Bride's Nationality", value: d.brideNationality },
+        { am: "ሀገር", en: "Country", value: d.country },
+        { am: "የተጋቡበት ቤተ ክርስቲያን", en: "Church", value: d.church },
+        { am: "የተጋቡበት ቀን", en: "Date of Marriage", value: fmtDate(d.dateOfMarriage) },
+        { am: "አጋቢው ካህን", en: "Officiating Priest", value: d.officiatingPriestName },
+        { am: "ምስክር 1", en: "Witness 1", value: d.witness1Name },
+        { am: "ምስክር 2", en: "Witness 2", value: d.witness2Name },
+        { am: "ምስክር 3", en: "Witness 3", value: d.witness3Name },
+      ].map((f) => ({ ...f, value: f.value || "" }));
+    }
+    // DEATH
+    return [
+      { am: "ሙሉ ስም", en: "Full Name", value: d.fullName },
+      { am: "የሰበካ አባል መለያ", en: "Sebeka Member ID", value: d.sebekaMemberId },
+      { am: "የአባልነት ዓይነት", en: "Member Type", value: d.memberType },
+      { am: "የስራ መደብ", en: "Occupation", value: d.occupation },
+      { am: "ማዕረግ", en: "Rank / Title", value: d.rankOrTitle },
+      { am: "የሞተበት ቀን", en: "Date of Death", value: fmtDate(d.dateOfDeath) },
+      { am: "የተቀበረበት ቦታ", en: "Burial Place", value: d.burialPlace },
+      { am: "አስፈጻሚ", en: "Officiant", value: d.officiant },
+      { am: "ማስታወሻ", en: "Remarks", value: d.remarks },
+    ].map((f) => ({ ...f, value: f.value || "" }));
+  };
+
+  const getCertifySubject = (): string => {
+    if (!generatedCert) return "";
+    const d = generatedCert.data || {};
+    if (generatedCert.type === "BAPTISM") return `${d.properName || ""} ${d.familyName || ""}`.trim();
+    if (generatedCert.type === "WEDDING") return `${d.groomFullName || ""} & ${d.brideFullName || ""}`.trim();
+    return d.fullName || "";
+  };
+
+  const getCertifyEventDate = (): string => {
+    if (!generatedCert) return "";
+    const d = generatedCert.data || {};
+    if (generatedCert.type === "BAPTISM") return fmtDate(d.dateOfBaptism);
+    if (generatedCert.type === "WEDDING") return fmtDate(d.dateOfMarriage);
+    return fmtDate(d.dateOfDeath);
+  };
+
+  const getCertifySentence = (): string => {
+    if (!generatedCert) return "";
+    if (generatedCert.type === "BAPTISM")
+      return "is baptized according to the Law and Order of Ethiopian Orthodox Tewahido Church at the above mentioned place and date.";
+    if (generatedCert.type === "WEDDING")
+      return "were married according to the Law and Order of Ethiopian Orthodox Tewahido Church at the above mentioned church and date.";
+    return "departed this life, as recorded according to the records of Ethiopian Orthodox Tewahido Church.";
+  };
 
   return (
     <DashboardLayout>
@@ -246,11 +388,11 @@ function CertificatesPageWr() {
             <CardTitle className="flex items-center gap-2">
               <Award className="h-5 w-5 text-primary" /> {t("Generate Certificate")}
             </CardTitle>
-            <CardDescription>{t("Select the child and certificate type above, then generate")}</CardDescription>
+            <CardDescription>{t("Select the certificate type above and fill in the details")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>{t("Child")} *</Label>
+              <Label>{type === "WEDDING" ? t("Groom") : t("Child")} *</Label>
               <Select value={childId} onValueChange={setChildId} disabled={loadingChildren}>
                 <SelectTrigger>
                   <SelectValue placeholder={loadingChildren ? t("Loading...") : t("Select a child")} />
@@ -265,33 +407,94 @@ function CertificatesPageWr() {
               </Select>
             </div>
 
+            {type === "WEDDING" && (
+              <div>
+                <Label>{t("Bride")} *</Label>
+                <Select value={brideChildId} onValueChange={setBrideChildId} disabled={loadingChildren}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("Select the bride")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {children.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.fullName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {type === "DEATH" && (
+              <div>
+                <Label>{t("Member Type")}</Label>
+                <Select value={deathMemberType} onValueChange={(v) => setDeathMemberType(v as any)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CHILD">{t("Child")}</SelectItem>
+                    <SelectItem value="FAMILY_HEAD">{t("Family Head")}</SelectItem>
+                    <SelectItem value="CLERGY">{t("Clergy")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div>
-              <Label>{t("Certificate Type")}</Label>
-              <Select value={type} onValueChange={(v) => setType(v as CertificateType)}>
+              <Label>
+                {type === "BAPTISM" ? t("Date of Baptism") : type === "WEDDING" ? t("Date of Marriage") : t("Date of Death")} *
+              </Label>
+              <Input type="date" value={dateOfEvent} onChange={(e) => setDateOfEvent(e.target.value)} />
+            </div>
+
+            {type !== "DEATH" && (
+              <div>
+                <Label>{t("Church")}</Label>
+                <Select value={church} onValueChange={setChurch}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("Select a church")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {churches.map((c) => (
+                      <SelectItem key={c.id} value={c.name}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {type === "DEATH" && (
+              <div>
+                <Label>{t("Burial Place")}</Label>
+                <Input value={burialPlace} onChange={(e) => setBurialPlace(e.target.value)} />
+              </div>
+            )}
+
+            <div>
+              <Label>
+                {type === "BAPTISM" ? t("Baptizing Priest") : type === "WEDDING" ? t("Officiating Priest") : t("Officiant")}
+              </Label>
+              <Select value={officiantId} onValueChange={setOfficiantId}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder={t("Select a priest")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {certificateOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {t(opt.label)}
+                  {fathers.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.fullName}
+                      {f.churchName ? ` — ${f.churchName}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="flex gap-2">
-              <Button onClick={handleGenerate} disabled={isSubmitting} size="lg" className="flex-1">
-                {isSubmitting ? t("Generating...") : t("Generate Certificate")}
-              </Button>
-              <Button onClick={handleCheckEligibility} variant="outline" size="lg">
-                {t("Check Eligibility")}
-              </Button>
-            </div>
-            {eligibility && (
-              <p className="text-sm text-muted-foreground border rounded-md p-2">{eligibility}</p>
-            )}
+            <Button onClick={handleGenerate} disabled={isSubmitting} size="lg" className="w-full">
+              {isSubmitting ? t("Generating...") : t("Generate Certificate")}
+            </Button>
           </CardContent>
         </Card>
 
@@ -306,12 +509,12 @@ function CertificatesPageWr() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="sm:col-span-1">
                 <Label>{t("Type")}</Label>
-                <Select value={verifyType} onValueChange={(v) => setVerifyType(v as typeof verifyType)}>
+                <Select value={verifyType} onValueChange={(v) => setVerifyType(v as CertificateType)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {verifiableTypes.map((v) => (
+                    {certificateOptions.map((v) => (
                       <SelectItem key={v.value} value={v.value}>
                         {t(v.label)}
                       </SelectItem>
@@ -341,15 +544,13 @@ function CertificatesPageWr() {
             <CardTitle className="flex items-center gap-2" style={{ color: CERT_COLOR_DARK }}>
               <FileText className="h-5 w-5" style={{ color: CERT_COLOR }} /> {t("Certificate Records")}
             </CardTitle>
-            <CardDescription>
-              {t("Browse issued baptism (birth), wedding, and death certificates")}
-            </CardDescription>
+            <CardDescription>{t("Browse issued baptism, wedding, and death certificates")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               {(
                 [
-                  { value: "BAPTISM", label: "Baptism / Birth", icon: Droplets },
+                  { value: "BAPTISM", label: "Baptism", icon: Droplets },
                   { value: "WEDDING", label: "Wedding", icon: HeartHandshake },
                   { value: "DEATH", label: "Death", icon: Cross },
                 ] as { value: RecordTab; label: string; icon: any }[]
@@ -525,7 +726,6 @@ function CertificatesPageWr() {
               style={{ borderColor: CERT_COLOR }}
             >
               <div className="border-2 p-6" style={{ borderColor: CERT_COLOR }}>
-                {/* Header */}
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex flex-col items-center w-20 pt-1">
                     <Award className="h-10 w-10" style={{ color: CERT_COLOR }} />
@@ -553,27 +753,12 @@ function CertificatesPageWr() {
                 </div>
 
                 <div className="text-right text-xs mt-2" style={{ color: CERT_COLOR }}>
-                  {t("Registration No.")} <span className="font-mono">{generatedCert.certId}</span>
+                  {t("Registration No.")}{" "}
+                  <span className="font-mono">{generatedCert.data?.registrationNo || ""}</span>
                 </div>
 
-                {/* Fields */}
                 <div className="mt-4 space-y-2 text-sm">
-                  {[
-                    { am: "የቤተሰብ ስም", en: "Family Name", value: generatedCert.childName.split(" ").slice(-1)[0] },
-                    { am: "የግል ስም", en: "Proper Name", value: generatedCert.childName.split(" ")[0] },
-                    { am: "የተጠመቀው(ችው) ክርስትና ስም", en: "Christian Name", value: "" },
-                    { am: "የአባት ስም", en: "Father's Name", value: "" },
-                    { am: "የእናት ስም", en: "Mother's Name", value: "" },
-                    { am: "የክርስትና አባት (እናት) ስም", en: "God Father's or Mothers' Name", value: "" },
-                    { am: "ሀገር", en: "Country", value: "" },
-                    { am: "የተወለደበት(ችበት) ቦታ", en: "Place of Birth", value: "" },
-                    { am: "የትውልድ ሀገር", en: "Nationality", value: "" },
-                    { am: "የተወለደበት(ችበት) ቀን", en: "Date of Birth", value: "" },
-                    { am: "የተጠመቀበት(ችበት) ቀን", en: "Date of Baptism", value: generatedCert.date },
-                    { am: "የተጠመቀበት(ችበት) ቤተ ክርስቲያን", en: "Church", value: "" },
-                    { am: "ዜግነት", en: "Citizenship", value: "" },
-                    { am: "አጥማቂው ካህን", en: "Baptizing Priest", value: "" },
-                  ].map((f, i) => (
+                  {getCertificateFields().map((f, i) => (
                     <div key={i} className="grid grid-cols-[1.4fr_1.6fr] gap-2 border-b border-dotted pb-1">
                       <span
                         className={certLang === "am" ? "text-xs" : "text-xs italic"}
@@ -587,10 +772,7 @@ function CertificatesPageWr() {
                 </div>
 
                 <p className="text-xs mt-4 leading-relaxed">
-                  {t("This is to certify that")} <strong>{generatedCert.childName}</strong>{" "}
-                  {t(
-                    "is baptized according to the Law and Order of Ethiopian Orthodox Tewahido Church at the above mentioned place and date."
-                  )}
+                  {t("This is to certify that")} <strong>{getCertifySubject()}</strong> {t(getCertifySentence())}
                 </p>
 
                 <div className="flex justify-between mt-8 text-xs">
@@ -600,7 +782,7 @@ function CertificatesPageWr() {
                   </div>
                   <div className="text-center">
                     <div className="w-32 border-t border-slate-500 mb-1" />
-                    {t("Date")} {generatedCert.date}
+                    {t("Date")} {getCertifyEventDate()}
                   </div>
                 </div>
               </div>
@@ -628,7 +810,6 @@ function CertificatesPageWr() {
     </DashboardLayout>
   );
 }
-
 
 export default function CertificatesPage() {
   return (
