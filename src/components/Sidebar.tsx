@@ -130,7 +130,10 @@ const baseMenu: MenuSection[] = [
         label: "Payments",
         icon: Banknote,
         path: "payments",
-        subMenu: [{ label: "Record Payment", path: "payments", type: "view" }],
+        subMenu: [
+          { label: "Record Payment", path: "payments", type: "view" },
+          { label: "Payment Reports", path: "payment-reports", type: "view" },
+        ],
       },
       {
         label: "Certificates",

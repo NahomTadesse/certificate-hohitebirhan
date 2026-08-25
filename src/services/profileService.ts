@@ -1,48 +1,45 @@
 import { authenticatedFetch } from "./api";
 
 export interface UserProfile {
-  resources: any;
-  id: number;
-  email: string;
-  phone: string;
-  fullName: string;
-  
-  role: "SUPER_ADMIN" | "ADMIN" | "DRIVER" | "DISPATCHER" | "FLEET_MANAGER";
-  status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
-  createdAt: string;
-  createdBy: string;
-  updatedAt: string;
-  updatedBy: string;
-  lastLogin: string;
-  organizationId?: number;
-  customerProfileId?: number;
+  userId?: string;
+  customerId?: string;
+  customerFirstName?: string;
+  customerLastName?: string;
+  customerImage?: string;
+  userLanguage?: string;
 }
 
 export interface UpdateProfilePayload {
-  email?: string;
-  phone?: string;
-  fullName?: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  phoneNumber?: string;
 }
 
 export interface ChangePasswordPayload {
-  currentPassword: string;
+  userId: string;
+  oldPassword: string;
   newPassword: string;
 }
 
-export const fetchUserProfile = async (): Promise<UserProfile> => {
-  console.log("helooooo")
-  return await authenticatedFetch<UserProfile>("api/auth/me");
+// GET /api/v1/user/user-details?accessToken=...
+export const fetchUserProfile = async (accessToken: string): Promise<UserProfile> => {
+  return await authenticatedFetch<UserProfile>(
+    `/api/v1/user/user-details?accessToken=${encodeURIComponent(accessToken)}`
+  );
 };
 
-export const updateUserProfile = async (payload: UpdateProfilePayload): Promise<UserProfile> => {
-  return await authenticatedFetch<UserProfile>("api/auth/me", {
+// PUT /api/v1/auth/{userId}
+export const updateUserProfile = async (userId: string, payload: UpdateProfilePayload): Promise<any> => {
+  return await authenticatedFetch<any>(`/api/v1/auth/${userId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 };
 
-export const changePassword = async (payload: ChangePasswordPayload): Promise<void> => {
-  return await authenticatedFetch<void>("/auth/change-password", {
+// POST /api/v1/auth/change-password
+export const changePassword = async (payload: ChangePasswordPayload): Promise<any> => {
+  return await authenticatedFetch<any>("/api/v1/auth/change-password", {
     method: "POST",
     body: JSON.stringify(payload),
   });

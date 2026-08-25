@@ -1,24 +1,34 @@
-import { authenticatedFetch } from "./api";
+import { authenticatedFetch, authenticatedFileUpload } from "./api";
 
 export interface Child {
   id: string;
+  prefix?: string; // e.g. "Ato", "W/ro", "Kes" - honorific shown before the name
   firstName: string;
   middleName: string;
   lastName: string;
+  christianName?: string;
+  motherName?: string;
+  email?: string;
   phoneNumber: string;
   dateOfBirth: string;
   gender: string;
   fatherId: string;
   fatherName?: string;
   fullName?: string;
+  profileImageUrl?: string;
+  isPrinted?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface CreateChildPayload {
+  prefix?: string;
   firstName: string;
   middleName: string;
   lastName: string;
+  christianName?: string;
+  motherName?: string;
+  email?: string;
   phoneNumber: string;
   dateOfBirth: string;
   gender: string;
@@ -126,12 +136,12 @@ export const fetchChildById = async (id: string): Promise<Child> => {
   return await authenticatedFetch<Child>(`/api/children/${id}`);
 };
 
-// POST: Create new child
-export const createChild = async (payload: CreateChildPayload): Promise<Child> => {
-  return await authenticatedFetch<Child>("/api/children", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+// POST: Create new child (multipart: dto + optional profileImage, per swagger)
+export const createChild = async (payload: CreateChildPayload, profileImage?: File | null): Promise<Child> => {
+  const formData = new FormData();
+  formData.append("dto", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+  if (profileImage) formData.append("profileImage", profileImage);
+  return await authenticatedFileUpload<Child>("/api/children", formData, "POST");
 };
 
 // PUT: Change father
@@ -148,12 +158,16 @@ export const deleteChild = async (id: string): Promise<void> => {
   });
 };
 
-// PUT: Update child
-export const updateChild = async (id: string, payload: Partial<CreateChildPayload>): Promise<any> => {
-  return await authenticatedFetch(`/api/children/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
+// PUT: Update child (multipart: dto + optional profileImage, per swagger)
+export const updateChild = async (
+  id: string,
+  payload: Partial<CreateChildPayload>,
+  profileImage?: File | null
+): Promise<any> => {
+  const formData = new FormData();
+  formData.append("dto", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+  if (profileImage) formData.append("profileImage", profileImage);
+  return await authenticatedFileUpload(`/api/children/${id}`, formData, "PUT");
 };
 
 // PATCH: Deactivate child

@@ -60,6 +60,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { fetchDioceses, Diocese } from "@/services/dioceseService";
+import SearchableSelect from "@/components/SearchableSelect";
 
 export default function ChurchManagement() {
   const [churches, setChurches] = useState<Church[]>([]);
@@ -267,6 +268,7 @@ export default function ChurchManagement() {
       address: church.address || { ...defaultAddress },
     });
     setSelectedChurch(church);
+    setActiveTab("basic");
     setIsDialogOpen(true);
   };
 
@@ -389,27 +391,14 @@ export default function ChurchManagement() {
                 </div>
                 <div>
                   <Label>{t("Diocese")} *</Label>
-                  <Select
+                  <SearchableSelect
                     value={formState.diocese}
-                    onValueChange={(value) => setFormState({ ...formState, diocese: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("Select a diocese")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {dioceses.length === 0 ? (
-                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                          {t("No dioceses found")}
-                        </div>
-                      ) : (
-                        dioceses.map((d) => (
-                          <SelectItem key={d.id} value={d.name}>
-                            {d.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                    onChange={(value) => setFormState({ ...formState, diocese: value })}
+                    options={dioceses.map((d) => ({ value: d.name, label: d.name }))}
+                    placeholder={t("Select a diocese")}
+                    searchPlaceholder={t("Search dioceses...")}
+                    emptyText={t("No dioceses found")}
+                  />
                 </div>
               </TabsContent>
               
@@ -512,9 +501,15 @@ export default function ChurchManagement() {
               <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
                 {t("Cancel")}
               </Button>
-              <Button onClick={handleSubmit} disabled={isSubmitting}>
-                {isSubmitting ? t("Saving...") : selectedChurch ? t("Update") : t("Create")}
-              </Button>
+              {activeTab === "basic" ? (
+                <Button type="button" onClick={() => setActiveTab("address")}>
+                  {t("Next")}
+                </Button>
+              ) : (
+                <Button onClick={handleSubmit} disabled={isSubmitting}>
+                  {isSubmitting ? t("Saving...") : selectedChurch ? t("Update") : t("Create")}
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

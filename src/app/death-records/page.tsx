@@ -49,6 +49,7 @@ import {
 } from "@/services/deathRecordService";
 import { fetchChildrenForDropdown } from "@/services/childrenService";
 import { fetchFathersForDropdown } from "@/services/fatherService";
+import SearchableSelect from "@/components/SearchableSelect";
 import { useTranslation } from "react-i18next";
 
 const MEMBER_TYPES: MemberType[] = ["CHILD", "FAMILY_HEAD", "CLERGY"];
@@ -269,7 +270,8 @@ export default function DeathRecordsManagement() {
 
     try {
       await recordDeath(formState);
-      toast.success("Death record created successfully!");
+      // This is a record, not a certificate — no document is generated or shown.
+      toast.success("Successfully recorded");
       await loadRecords();
       setIsDialogOpen(false);
     } catch (err: any) {
@@ -383,21 +385,13 @@ export default function DeathRecordsManagement() {
 
               <div>
                 <Label>{t("Member")} *</Label>
-                <Select
+                <SearchableSelect
                   value={formState.memberId}
-                  onValueChange={(v) => setFormState({ ...formState, memberId: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("Select member")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {memberOptions.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setFormState({ ...formState, memberId: v })}
+                  options={memberOptions.map((m) => ({ value: m.id, label: m.fullName }))}
+                  placeholder={t("Select member")}
+                  searchPlaceholder={t("Search members...")}
+                />
               </div>
 
               <div>

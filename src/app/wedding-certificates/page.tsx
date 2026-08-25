@@ -45,6 +45,7 @@ import {
 import { fetchChurchesForDropdown } from "@/services/churchService";
 import { fetchFathersForDropdown } from "@/services/fatherService";
 import { fetchChildrenForDropdown } from "@/services/childrenService";
+import SearchableSelect from "@/components/SearchableSelect";
 import { useTranslation } from "react-i18next";
 
 // Unified brand color for certificates - a deep blue-green (teal) mix
@@ -320,18 +321,14 @@ export default function WeddingCertificatesManagement() {
             />
           </div>
 
-          <Select value={churchId} onValueChange={setChurchId}>
-            <SelectTrigger className="w-full sm:w-56">
-              <SelectValue placeholder={t("Select a church")} />
-            </SelectTrigger>
-            <SelectContent>
-              {churches.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={churchId}
+            onChange={setChurchId}
+            options={churches.map((c) => ({ value: c.id, label: c.name }))}
+            placeholder={t("Select a church")}
+            searchPlaceholder={t("Search churches...")}
+            className="w-full sm:w-56"
+          />
 
           <Button variant="outline" size="icon" onClick={() => loadRecords()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -362,27 +359,19 @@ export default function WeddingCertificatesManagement() {
             <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
               <div>
                 <Label>{t("Groom")}</Label>
-                <Select
+                <SearchableSelect
                   value={formState.groomChildId}
-                  onValueChange={(v) =>
+                  onChange={(v) =>
                     setFormState({
                       ...formState,
                       groomChildId: v,
                       groomFullName: children.find((c) => c.id === v)?.fullName || formState.groomFullName,
                     })
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("Select groom (optional)")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {children.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={children.map((c) => ({ value: c.id, label: c.fullName }))}
+                  placeholder={t("Select groom (optional)")}
+                  searchPlaceholder={t("Search children...")}
+                />
               </div>
               <div>
                 <Label>{t("Groom Full Name")} *</Label>
@@ -401,27 +390,19 @@ export default function WeddingCertificatesManagement() {
 
               <div>
                 <Label>{t("Bride")}</Label>
-                <Select
+                <SearchableSelect
                   value={formState.brideChildId}
-                  onValueChange={(v) =>
+                  onChange={(v) =>
                     setFormState({
                       ...formState,
                       brideChildId: v,
                       brideFullName: children.find((c) => c.id === v)?.fullName || formState.brideFullName,
                     })
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("Select bride (optional)")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {children.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={children.map((c) => ({ value: c.id, label: c.fullName }))}
+                  placeholder={t("Select bride (optional)")}
+                  searchPlaceholder={t("Search children...")}
+                />
               </div>
               <div>
                 <Label>{t("Bride Full Name")} *</Label>
@@ -454,27 +435,19 @@ export default function WeddingCertificatesManagement() {
               </div>
               <div>
                 <Label>{t("Officiating Priest")}</Label>
-                <Select
+                <SearchableSelect
                   value={formState.officiatingPriestId}
-                  onValueChange={(v) =>
+                  onChange={(v) =>
                     setFormState({
                       ...formState,
                       officiatingPriestId: v,
                       officiatingPriestName: priests.find((p) => p.id === v)?.fullName || "",
                     })
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("Select priest")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {priests.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={priests.map((p) => ({ value: p.id, label: p.fullName }))}
+                  placeholder={t("Select priest")}
+                  searchPlaceholder={t("Search priests...")}
+                />
               </div>
               <div>
                 <Label>{t("Witness 1")}</Label>

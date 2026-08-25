@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import { Users, Search, RefreshCw, AlertCircle, CheckCircle, XCircle, Edit, Plus } from "lucide-react";
+import { Users, Search, RefreshCw, AlertCircle, CheckCircle, XCircle, Edit, Plus, Power } from "lucide-react";
+import PhoneInput from "@/components/PhoneInput";
+import { getPhoneValidationError } from "@/utils/phone";
 
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/DataTable";
@@ -31,6 +33,7 @@ import {
   fetchAllUsersPaginated,
   updateUser,
   createUser,
+  setUserStatus,
   AdminUser,
   UserRole,
   UserStatus,
@@ -68,6 +71,7 @@ export default function UsersManagement() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formState, setFormState] = useState<{
     firstName: string;
+    middleName: string;
     lastName: string;
     phoneNumber: string;
     role: UserRole;
@@ -77,6 +81,7 @@ export default function UsersManagement() {
     password: string;
   }>({
     firstName: "",
+    middleName: "",
     lastName: "",
     phoneNumber: "",
     role: "USER",
@@ -85,6 +90,7 @@ export default function UsersManagement() {
     userName: "",
     password: "",
   });
+  const [togglingUuid, setTogglingUuid] = useState<string | null>(null);
 
   const loadUsers = useCallback(async (search?: string) => {
     setLoading(true);
@@ -172,23 +178,67 @@ export default function UsersManagement() {
       ),
     },
     {
+      accessorKey: "status",
+      header: t("Status"),
+      cell: ({ row }) => {
+        const status = row.original.status || "ACTIVE";
+        const isActive = status === "ACTIVE";
+        return (
+          <Badge variant={isActive ? "default" : "outline"} className={isActive ? "" : "text-muted-foreground"}>
+            {t(status)}
+          </Badge>
+        );
+      },
+    },
+    {
       id: "actions",
-      cell: ({ row }) => (
-        <Button size="sm" variant="ghost" onClick={() => handleEdit(row.original)}>
-          <Edit className="h-4 w-4" />
-        </Button>
-      ),
+      cell: ({ row }) => {
+        const isActive = (row.original.status || "ACTIVE") === "ACTIVE";
+        const uuid = row.original.uuid;
+        return (
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="ghost" onClick={() => handleEdit(row.original)}>
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!uuid || togglingUuid === uuid}
+              title={isActive ? t("Disable user") : t("Enable user")}
+              onClick={() => handleToggleStatus(row.original)}
+            >
+              <Power className={`h-4 w-4 ${isActive ? "text-green-600" : "text-muted-foreground"}`} />
+            </Button>
+          </div>
+        );
+      },
     },
   ];
+
+  const handleToggleStatus = async (user: AdminUser) => {
+    if (!user.uuid) return;
+    const nextStatus: UserStatus = (user.status || "ACTIVE") === "ACTIVE" ? "BLOCKED" : "ACTIVE";
+    setTogglingUuid(user.uuid);
+    try {
+      await setUserStatus(user.uuid, nextStatus);
+      toast.success(nextStatus === "ACTIVE" ? "User enabled" : "User disabled");
+      await loadUsers(searchQuery);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update status");
+    } finally {
+      setTogglingUuid(null);
+    }
+  };
 
   const handleEdit = (user: AdminUser) => {
     setSelectedUser(user);
     setFormState({
       firstName: user.firstname || "",
+      middleName: user.middlename || "",
       lastName: user.lastname || "",
       phoneNumber: user.phoneNumber || "",
       role: (user.role as UserRole) || "USER",
-      status: "ACTIVE",
+      status: user.status || "ACTIVE",
       email: user.email || "",
       userName: user.userName || "",
       password: "",
@@ -200,6 +250,7 @@ export default function UsersManagement() {
     setSelectedUser(null);
     setFormState({
       firstName: "",
+      middleName: "",
       lastName: "",
       phoneNumber: "",
       role: "USER",
@@ -212,11 +263,17 @@ export default function UsersManagement() {
   };
 
   const handleSubmit = async () => {
+    const phoneError = getPhoneValidationError(formState.phoneNumber);
+    if (phoneError) {
+      toast.error(phoneError);
+      return;
+    }
     setIsSubmitting(true);
     try {
       if (selectedUser?.uuid) {
         await updateUser(selectedUser.uuid, {
           firstName: formState.firstName,
+          middleName: formState.middleName,
           lastName: formState.lastName,
           phoneNumber: formState.phoneNumber,
           role: formState.role,
@@ -231,6 +288,7 @@ export default function UsersManagement() {
         }
         await createUser({
           firstName: formState.firstName,
+          middleName: formState.middleName,
           lastName: formState.lastName,
           email: formState.email,
           phoneNumber: formState.phoneNumber,
@@ -328,12 +386,19 @@ export default function UsersManagement() {
                   />
                 </div>
                 <div>
-                  <Label>{t("Last Name")}</Label>
+                  <Label>{t("Middle Name")}</Label>
                   <Input
-                    value={formState.lastName}
-                    onChange={(e) => setFormState({ ...formState, lastName: e.target.value })}
+                    value={formState.middleName}
+                    onChange={(e) => setFormState({ ...formState, middleName: e.target.value })}
                   />
                 </div>
+              </div>
+              <div>
+                <Label>{t("Last Name")}</Label>
+                <Input
+                  value={formState.lastName}
+                  onChange={(e) => setFormState({ ...formState, lastName: e.target.value })}
+                />
               </div>
               {!selectedUser && (
                 <div className="grid grid-cols-2 gap-4">
@@ -354,13 +419,11 @@ export default function UsersManagement() {
                   </div>
                 </div>
               )}
-              <div>
-                <Label>{t("Phone Number")}</Label>
-                <Input
-                  value={formState.phoneNumber}
-                  onChange={(e) => setFormState({ ...formState, phoneNumber: e.target.value })}
-                />
-              </div>
+              <PhoneInput
+                label={t("Phone Number")}
+                value={formState.phoneNumber}
+                onChange={(v) => setFormState({ ...formState, phoneNumber: v })}
+              />
               {!selectedUser && (
                 <div>
                   <Label>{t("Password")} *</Label>

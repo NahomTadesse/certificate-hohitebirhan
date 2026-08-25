@@ -54,6 +54,7 @@ import { fetchFathersForDropdown } from "@/services/fatherService";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import SearchableSelect from "@/components/SearchableSelect";
 
 // Unified brand color for certificates - a deep blue-green (teal) mix
 const CERT_COLOR = "#6bb1f7";
@@ -393,35 +394,27 @@ function CertificatesPageWr() {
           <CardContent className="space-y-4">
             <div>
               <Label>{type === "WEDDING" ? t("Groom") : t("Child")} *</Label>
-              <Select value={childId} onValueChange={setChildId} disabled={loadingChildren}>
-                <SelectTrigger>
-                  <SelectValue placeholder={loadingChildren ? t("Loading...") : t("Select a child")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {children.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.fullName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={childId}
+                onChange={setChildId}
+                options={children.map((c) => ({ value: c.id, label: c.fullName }))}
+                placeholder={loadingChildren ? t("Loading...") : t("Select a child")}
+                searchPlaceholder={t("Search children...")}
+                disabled={loadingChildren}
+              />
             </div>
 
             {type === "WEDDING" && (
               <div>
                 <Label>{t("Bride")} *</Label>
-                <Select value={brideChildId} onValueChange={setBrideChildId} disabled={loadingChildren}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("Select the bride")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {children.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={brideChildId}
+                  onChange={setBrideChildId}
+                  options={children.map((c) => ({ value: c.id, label: c.fullName }))}
+                  placeholder={t("Select the bride")}
+                  searchPlaceholder={t("Search children...")}
+                  disabled={loadingChildren}
+                />
               </div>
             )}
 
@@ -451,18 +444,13 @@ function CertificatesPageWr() {
             {type !== "DEATH" && (
               <div>
                 <Label>{t("Church")}</Label>
-                <Select value={church} onValueChange={setChurch}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("Select a church")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {churches.map((c) => (
-                      <SelectItem key={c.id} value={c.name}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={church}
+                  onChange={setChurch}
+                  options={churches.map((c) => ({ value: c.name, label: c.name }))}
+                  placeholder={t("Select a church")}
+                  searchPlaceholder={t("Search churches...")}
+                />
               </div>
             )}
 
@@ -477,19 +465,16 @@ function CertificatesPageWr() {
               <Label>
                 {type === "BAPTISM" ? t("Baptizing Priest") : type === "WEDDING" ? t("Officiating Priest") : t("Officiant")}
               </Label>
-              <Select value={officiantId} onValueChange={setOfficiantId}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t("Select a priest")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {fathers.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
-                      {f.fullName}
-                      {f.churchName ? ` — ${f.churchName}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={officiantId}
+                onChange={setOfficiantId}
+                options={fathers.map((f) => ({
+                  value: f.id,
+                  label: f.fullName + (f.churchName ? ` — ${f.churchName}` : ""),
+                }))}
+                placeholder={t("Select a priest")}
+                searchPlaceholder={t("Search priests...")}
+              />
             </div>
 
             <Button onClick={handleGenerate} disabled={isSubmitting} size="lg" className="w-full">

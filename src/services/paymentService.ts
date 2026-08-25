@@ -9,6 +9,7 @@ export interface MakePaymentPayload {
   rate: number;
   type: PaymentType;
   months: number;
+  paymentReference?: string;
 }
 
 export interface Payment {
@@ -33,30 +34,34 @@ export interface BaseResponse<T = any> {
   data?: T;
 }
 
-// POST: Pay membership fee for a child (supports optional custom rate/reason)
+// POST: Pay membership fee for a child (supports optional custom rate/reason/reference)
 export const payMembership = async (
   childId: string,
   months = 1,
   customRate?: number,
-  customReason?: string
+  customReason?: string,
+  paymentReference?: string
 ): Promise<BaseResponse> => {
   const params = new URLSearchParams({ childId, months: String(months) });
   if (customRate !== undefined) params.set("customRate", String(customRate));
   if (customReason) params.set("customReason", customReason);
+  if (paymentReference) params.set("paymentReference", paymentReference);
   return await authenticatedFetch<BaseResponse>(`/api/payments/membership?${params.toString()}`, {
     method: "POST",
   });
 };
 
-// POST: Pay certificate fee for a child (supports optional custom rate/reason)
+// POST: Pay certificate fee for a child (supports optional custom rate/reason/reference)
 export const payCertificateFee = async (
   childId: string,
   customRate?: number,
-  customReason?: string
+  customReason?: string,
+  paymentReference?: string
 ): Promise<BaseResponse> => {
   const params = new URLSearchParams({ childId });
   if (customRate !== undefined) params.set("customRate", String(customRate));
   if (customReason) params.set("customReason", customReason);
+  if (paymentReference) params.set("paymentReference", paymentReference);
   return await authenticatedFetch<BaseResponse>(`/api/payments/certificate?${params.toString()}`, {
     method: "POST",
   });
@@ -122,6 +127,7 @@ export const makePayment = async (payload: MakePaymentPayload): Promise<BaseResp
     payload.childId,
     payload.months,
     payload.rate,
-    payload.type === "PREPAID" ? "Prepaid membership payment" : undefined
+    payload.type === "PREPAID" ? "Prepaid membership payment" : undefined,
+    payload.paymentReference
   );
 };

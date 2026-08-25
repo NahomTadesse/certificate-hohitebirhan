@@ -1474,6 +1474,9 @@ import {
 } from "@/services/fatherService";
 import { fetchChurchesForDropdown } from "@/services/churchService";
 import { fetchDiocesesForDropdown } from "@/services/dioceseService";
+import SearchableSelect from "@/components/SearchableSelect";
+import PhoneInput from "@/components/PhoneInput";
+import { getPhoneValidationError } from "@/utils/phone";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 
@@ -1511,6 +1514,7 @@ export default function FatherManagement() {
   const [transferChurchId, setTransferChurchId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
+  const [registrationDocuments, setRegistrationDocuments] = useState<File[]>([]);
   const { t } = useTranslation();
 
   const defaultSpiritualInfo: SpiritualInfo = {
@@ -1540,6 +1544,8 @@ export default function FatherManagement() {
     firstName: "",
     middleName: "",
     lastName: "",
+    christianName: "",
+    motherName: "",
     phoneNumber: "",
     churchId: "",
     dioceseId: "",
@@ -1818,6 +1824,8 @@ const loadData = useCallback(async (search?: string) => {
       firstName: "",
       middleName: "",
       lastName: "",
+      christianName: "",
+      motherName: "",
       phoneNumber: "",
       churchId: "",
       dioceseId: "",
@@ -1829,6 +1837,7 @@ const loadData = useCallback(async (search?: string) => {
       educationList: [defaultEducation],
     });
     setActiveTab("basic");
+    setRegistrationDocuments([]);
     setIsDialogOpen(true);
   };
 
@@ -1934,10 +1943,16 @@ const loadData = useCallback(async (search?: string) => {
     setIsSubmitting(true);
 
     try {
-      await createFather(formState);
+      const payload = {
+        ...formState,
+        christianName: formState.christianName || undefined,
+        motherName: formState.motherName || undefined,
+      };
+      await createFather(payload, registrationDocuments);
       toast.success("Father registered successfully!");
       await loadData();
       setIsDialogOpen(false);
+      setRegistrationDocuments([]);
     } catch (err: any) {
       toast.error(err.message || "Operation failed");
     } finally {
@@ -2395,49 +2410,59 @@ const loadData = useCallback(async (search?: string) => {
                     onChange={(e) => setFormState({ ...formState, lastName: e.target.value })}
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t("Christian Name")}</Label>
+                    <Input
+                      value={formState.christianName || ""}
+                      onChange={(e) => setFormState({ ...formState, christianName: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("Mother's Name")}</Label>
+                    <Input
+                      value={formState.motherName || ""}
+                      onChange={(e) => setFormState({ ...formState, motherName: e.target.value })}
+                    />
+                  </div>
+                </div>
                 <div>
-                  <Label>{t("Phone Number")}</Label>
+                  <Label>{t("Profile / Registration Documents")}</Label>
                   <Input
-                    type="tel"
-                    value={formState.phoneNumber}
-                    onChange={(e) => setFormState({ ...formState, phoneNumber: e.target.value })}
+                    type="file"
+                    multiple
+                    onChange={(e) => setRegistrationDocuments(Array.from(e.target.files || []))}
+                  />
+                  {registrationDocuments.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {registrationDocuments.length} {t("file(s) selected")}
+                    </p>
+                  )}
+                </div>
+                <PhoneInput
+                  label={t("Phone Number")}
+                  value={formState.phoneNumber}
+                  onChange={(v) => setFormState({ ...formState, phoneNumber: v })}
+                />
+                <div>
+                  <Label>{t("Church")} *</Label>
+                  <SearchableSelect
+                    value={formState.churchId}
+                    onChange={(v) => setFormState({ ...formState, churchId: v })}
+                    options={churches.map((church) => ({ value: church.id, label: church.name }))}
+                    placeholder={t("Select church")}
+                    searchPlaceholder={t("Search churches...")}
                   />
                 </div>
                 <div>
-                  <Label>{t("Church")} *</Label>
-                  <Select
-                    value={formState.churchId}
-                    onValueChange={(v) => setFormState({ ...formState, churchId: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select church" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {churches.map((church) => (
-                        <SelectItem key={church.id} value={church.id}>
-                          {church.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
                   <Label>{t("Diocese")}</Label>
-                  <Select
+                  <SearchableSelect
                     value={formState.dioceseId}
-                    onValueChange={(v) => setFormState({ ...formState, dioceseId: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("Select diocese")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {dioceses.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(v) => setFormState({ ...formState, dioceseId: v })}
+                    options={dioceses.map((d) => ({ value: d.id, label: d.name }))}
+                    placeholder={t("Select diocese")}
+                    searchPlaceholder={t("Search dioceses...")}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -2599,6 +2624,16 @@ const loadData = useCallback(async (search?: string) => {
                         />
                       </div>
                     </div>
+                    <div>
+                      <Label>Supporting Document</Label>
+                      <Input
+                        type="file"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) setRegistrationDocuments((prev) => [...prev, file]);
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
                 <Button type="button" variant="outline" onClick={addServiceHistory} className="w-full">
@@ -2661,9 +2696,26 @@ const loadData = useCallback(async (search?: string) => {
               <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
                 {t("Cancel")}
               </Button>
-              <Button onClick={handleSubmit} disabled={isSubmitting}>
-                {isSubmitting ? t("Saving...") : t("Register")}
-              </Button>
+              {(() => {
+                const steps = ["basic", "spiritual", "service", "education"];
+                const idx = steps.indexOf(activeTab);
+                const isLast = idx === steps.length - 1;
+                if (!isLast) {
+                  return (
+                    <Button
+                      type="button"
+                      onClick={() => setActiveTab(steps[Math.min(idx + 1, steps.length - 1)])}
+                    >
+                      {t("Next")}
+                    </Button>
+                  );
+                }
+                return (
+                  <Button onClick={handleSubmit} disabled={isSubmitting}>
+                    {isSubmitting ? t("Saving...") : t("Register")}
+                  </Button>
+                );
+              })()}
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -2679,18 +2731,13 @@ const loadData = useCallback(async (search?: string) => {
             </p>
             <div>
               <Label>{t("New Church")} *</Label>
-              <Select value={transferChurchId} onValueChange={setTransferChurchId}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t("Select destination church")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {churches.map((church) => (
-                    <SelectItem key={church.id} value={church.id}>
-                      {church.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={transferChurchId}
+                onChange={setTransferChurchId}
+                options={churches.map((church) => ({ value: church.id, label: church.name }))}
+                placeholder={t("Select destination church")}
+                searchPlaceholder={t("Search churches...")}
+              />
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsTransferDialogOpen(false)}>

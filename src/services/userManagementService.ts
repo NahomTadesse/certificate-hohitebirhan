@@ -25,16 +25,19 @@ export type UserStatus =
 export interface AdminUser {
   userName?: string;
   firstname?: string;
+  middlename?: string;
   lastname?: string;
   email?: string;
   phoneNumber?: string;
   role?: UserRole;
+  status?: UserStatus;
   createdDate?: string;
   uuid?: string;
 }
 
 export interface UpdateUserPayload {
   firstName?: string;
+  middleName?: string;
   lastName?: string;
   phoneNumber?: string;
   role?: UserRole;
@@ -43,6 +46,7 @@ export interface UpdateUserPayload {
 
 export interface CreateUserPayload {
   firstName?: string;
+  middleName?: string;
   lastName?: string;
   email?: string;
   phoneNumber?: string;
@@ -114,4 +118,9 @@ export const updateUser = async (userId: string, payload: UpdateUserPayload): Pr
     method: "PUT",
     body: JSON.stringify(payload),
   });
+};
+
+// PUT: Quick enable/disable toggle from the users table
+export const setUserStatus = async (userId: string, status: UserStatus): Promise<BaseResponse> => {
+  return await updateUser(userId, { status });
 };

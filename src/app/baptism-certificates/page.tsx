@@ -44,6 +44,7 @@ import {
 } from "@/services/baptismCertificateService";
 import { fetchChurchesForDropdown } from "@/services/churchService";
 import { fetchFathersForDropdown } from "@/services/fatherService";
+import SearchableSelect from "@/components/SearchableSelect";
 import { useTranslation } from "react-i18next";
 
 // Unified brand color for certificates - a deep blue-green (teal) mix
@@ -320,18 +321,14 @@ export default function BaptismCertificatesManagement() {
             />
           </div>
 
-          <Select value={churchId} onValueChange={setChurchId}>
-            <SelectTrigger className="w-full sm:w-56">
-              <SelectValue placeholder={t("Select a church")} />
-            </SelectTrigger>
-            <SelectContent>
-              {churches.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={churchId}
+            onChange={setChurchId}
+            options={churches.map((c) => ({ value: c.id, label: c.name }))}
+            placeholder={t("Select a church")}
+            searchPlaceholder={t("Search churches...")}
+            className="w-full sm:w-56"
+          />
 
           <Button variant="outline" size="icon" onClick={() => loadRecords()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -458,27 +455,19 @@ export default function BaptismCertificatesManagement() {
               </div>
               <div>
                 <Label>{t("Baptizing Priest")}</Label>
-                <Select
+                <SearchableSelect
                   value={formState.baptizingPriestId}
-                  onValueChange={(v) =>
+                  onChange={(v) =>
                     setFormState({
                       ...formState,
                       baptizingPriestId: v,
                       baptizingPriestName: priests.find((p) => p.id === v)?.fullName || "",
                     })
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("Select priest")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {priests.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={priests.map((p) => ({ value: p.id, label: p.fullName }))}
+                  placeholder={t("Select priest")}
+                  searchPlaceholder={t("Search priests...")}
+                />
               </div>
               <div>
                 <Label>{t("Church Administrator Name")}</Label>

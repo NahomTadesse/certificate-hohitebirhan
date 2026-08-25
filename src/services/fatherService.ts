@@ -1,6 +1,6 @@
 
 
-import { authenticatedFetch } from "./api";
+import { authenticatedFetch, authenticatedFileUpload } from "./api";
 
 export interface SpiritualInfo {
   kinetPlace: string;
@@ -53,6 +53,8 @@ export interface CreateFatherPayload {
   firstName: string;
   middleName: string;
   lastName: string;
+  christianName?: string;
+  motherName?: string;
   phoneNumber: string;
   userId?: string;
   churchId: string;
@@ -146,8 +148,14 @@ export const fetchFathersByChurch = async (churchId: string): Promise<PaginatedR
   return response || { content: [], totalElements: 0, totalPages: 0, empty: true } as PaginatedResponse<Father>;
 };
 
+export interface FatherDropdownOption {
+  id: string;
+  fullName: string;
+  churchName?: string;
+}
+
 // GET: Get fathers for dropdown (simplified - extracts from paginated response)
-export const fetchFathersForDropdown = async (): Promise<{ id: string; fullName: string; churchName?: string }[]> => {
+export const fetchFathersForDropdown = async (): Promise<FatherDropdownOption[]> => {
   const response = await authenticatedFetch<PaginatedResponse<Father>>("/api/fathers");
   
   // Check if response exists and has content
@@ -172,12 +180,35 @@ export const fetchFathersForDropdown = async (): Promise<{ id: string; fullName:
   return [];
 };
 
-// POST: Create new father
-export const createFather = async (payload: CreateFatherPayload): Promise<Father> => {
+// POST: Create new father (multipart: dto + optional documents/documentTypes, per swagger)
+export const createFather = async (
+  payload: CreateFatherPayload,
+  documents?: File[],
+  documentTypes?: string[]
+): Promise<Father> => {
+  if (documents && documents.length > 0) {
+    const formData = new FormData();
+    formData.append("dto", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+    documents.forEach((file) => formData.append("documents", file));
+    (documentTypes || []).forEach((dt) => formData.append("documentTypes", dt));
+    return await authenticatedFileUpload<Father>("/api/fathers", formData, "POST");
+  }
   return await authenticatedFetch<Father>("/api/fathers", {
     method: "POST",
     body: JSON.stringify(payload),
   });
+};
+
+// POST: Upload additional documents for an existing father (e.g. service-history attachments)
+export const uploadFatherDocuments = async (
+  fatherId: string,
+  documents: File[],
+  documentTypes?: string[]
+): Promise<any> => {
+  const formData = new FormData();
+  documents.forEach((file) => formData.append("documents", file));
+  (documentTypes || []).forEach((dt) => formData.append("documentTypes", dt));
+  return await authenticatedFileUpload(`/api/fathers/${fatherId}/documents`, formData, "POST");
 };
 
 // DELETE: Delete father

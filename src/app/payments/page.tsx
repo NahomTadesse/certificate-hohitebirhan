@@ -38,6 +38,7 @@ import {
   PaymentReportType,
 } from "@/services/paymentService";
 import { fetchChildrenForDropdown } from "@/services/childrenService";
+import SearchableSelect from "@/components/SearchableSelect";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "next/navigation";
 
@@ -62,6 +63,7 @@ function PaymentsPageWra() {
     rate: "",
     type: "MONTHLY" as PaymentType,
     months: "1",
+    paymentReference: "",
   });
 
   const loadChildren = useCallback(async () => {
@@ -97,6 +99,7 @@ function PaymentsPageWra() {
         rate: rateNum,
         type: formState.type,
         months: monthsNum,
+        paymentReference: formState.paymentReference || undefined,
       });
 
       const childName = children.find((c) => c.id === formState.childId)?.fullName || "-";
@@ -185,11 +188,16 @@ function PaymentsPageWra() {
   return (
     <DashboardLayout>
       <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Banknote className="h-8 w-8 text-primary" /> {t("Payments")}
-          </h1>
-          <p className="text-muted-foreground">{t("Record membership payments for children")}</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Banknote className="h-8 w-8 text-primary" /> {t("Payments")}
+            </h1>
+            <p className="text-muted-foreground">{t("Record membership payments for children")}</p>
+          </div>
+          <Button variant="outline" onClick={() => (window.location.href = "/payment-reports")}>
+            {t("View Payment Reports")}
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -203,22 +211,14 @@ function PaymentsPageWra() {
             <CardContent className="space-y-4">
               <div>
                 <Label>{t("Child")} *</Label>
-                <Select
+                <SearchableSelect
                   value={formState.childId}
-                  onValueChange={(v) => setFormState({ ...formState, childId: v })}
+                  onChange={(v) => setFormState({ ...formState, childId: v })}
+                  options={children.map((c) => ({ value: c.id, label: c.fullName }))}
+                  placeholder={loadingChildren ? t("Loading...") : t("Select a child")}
+                  searchPlaceholder={t("Search children...")}
                   disabled={loadingChildren}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={loadingChildren ? t("Loading...") : t("Select a child")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {children.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -257,6 +257,15 @@ function PaymentsPageWra() {
                   value={formState.rate}
                   onChange={(e) => setFormState({ ...formState, rate: e.target.value })}
                   placeholder="0.00"
+                />
+              </div>
+
+              <div>
+                <Label>{t("Payment Reference")}</Label>
+                <Input
+                  value={formState.paymentReference}
+                  onChange={(e) => setFormState({ ...formState, paymentReference: e.target.value })}
+                  placeholder={t("Bank slip / transaction reference (optional)")}
                 />
               </div>
 
@@ -321,18 +330,14 @@ function PaymentsPageWra() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2">
-                <Select value={historyChildId} onValueChange={setHistoryChildId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("Select a child")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {children.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={historyChildId}
+                  onChange={setHistoryChildId}
+                  options={children.map((c) => ({ value: c.id, label: c.fullName }))}
+                  placeholder={t("Select a child")}
+                  searchPlaceholder={t("Search children...")}
+                  className="flex-1"
+                />
                 <Button variant="outline" onClick={handleLoadHistory} disabled={loadingHistory}>
                   {loadingHistory ? t("Loading...") : t("Load")}
                 </Button>
@@ -370,18 +375,13 @@ function PaymentsPageWra() {
             <CardContent className="space-y-4">
               <div>
                 <Label>{t("Child")} *</Label>
-                <Select value={waiveChildId} onValueChange={setWaiveChildId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("Select a child")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {children.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={waiveChildId}
+                  onChange={setWaiveChildId}
+                  options={children.map((c) => ({ value: c.id, label: c.fullName }))}
+                  placeholder={t("Select a child")}
+                  searchPlaceholder={t("Search children...")}
+                />
               </div>
               <div>
                 <Label>{t("Reason")} *</Label>
@@ -393,71 +393,6 @@ function PaymentsPageWra() {
             </CardContent>
           </Card>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("Payments Report")}</CardTitle>
-            <CardDescription>{t("Generate a report of payments within a date range")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <div>
-                <Label>{t("Type")}</Label>
-                <Select value={reportType} onValueChange={(v) => setReportType(v as PaymentReportType)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MEMBERSHIP">{t("Membership")}</SelectItem>
-                    <SelectItem value="CERTIFICATE">{t("Certificate")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>{t("Start Date")}</Label>
-                <Input type="date" value={reportStart} onChange={(e) => setReportStart(e.target.value)} />
-              </div>
-              <div>
-                <Label>{t("End Date")}</Label>
-                <Input type="date" value={reportEnd} onChange={(e) => setReportEnd(e.target.value)} />
-              </div>
-              <div className="flex items-end">
-                <Button className="w-full" onClick={handleLoadReport} disabled={loadingReport}>
-                  {loadingReport ? t("Loading...") : t("Run Report")}
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2 max-h-72 overflow-y-auto">
-              {report.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  {t("Run a report to see results here.")}
-                </p>
-              ) : (
-                <>
-                  <div className="flex justify-between text-sm font-semibold border-b pb-2">
-                    <span>{t("Total")}</span>
-                    <span>{report.reduce((sum, p) => sum + (p.amount || 0), 0).toFixed(2)}</span>
-                  </div>
-                  {report.map((p, i) => (
-                    <div key={p.id || i} className="flex justify-between items-center text-sm border-b pb-2">
-                      <div>
-                        <div className="font-medium">{p.childName || p.childId}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {p.periodStart} – {p.periodEnd}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold">{p.amount?.toFixed?.(2) ?? p.amount}</div>
-                        <Badge variant="outline">{p.status}</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </DashboardLayout>
   );

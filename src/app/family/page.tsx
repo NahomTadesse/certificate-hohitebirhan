@@ -453,6 +453,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import DashboardLayout from "../dashboard/layout";
 import { fetchChildrenForDropdown } from "@/services/childrenService";
+import SearchableSelect from "@/components/SearchableSelect";
 import {
   addFamilyMember,
   recordMarriage,
@@ -613,18 +614,13 @@ export default function FamilyManagement() {
           <TabsContent value="member" className="space-y-4 max-w-2xl">
             <div>
               <Label>{t("Family Head")} *</Label>
-              <Select value={familyHeadId} onValueChange={setFamilyHeadId}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t("Select family head")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {children.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.fullName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={familyHeadId}
+                onChange={setFamilyHeadId}
+                options={children.map((c) => ({ value: c.id, label: c.fullName }))}
+                placeholder={t("Select family head")}
+                searchPlaceholder={t("Search children...")}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -686,24 +682,18 @@ export default function FamilyManagement() {
             </div>
             <div>
               <Label>{t("Existing Child (optional)")}</Label>
-              <Select
+              <SearchableSelect
                 value={memberForm.existingChildId || NONE_VALUE}
-                onValueChange={(v) =>
+                onChange={(v) =>
                   setMemberForm({ ...memberForm, existingChildId: v === NONE_VALUE ? "" : v })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("Link to an already-registered child")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE_VALUE}>{t("None - create a new record")}</SelectItem>
-                  {children.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.fullName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={[
+                  { value: NONE_VALUE, label: t("None - create a new record") },
+                  ...children.map((c) => ({ value: c.id, label: c.fullName })),
+                ]}
+                placeholder={t("Link to an already-registered child")}
+                searchPlaceholder={t("Search children...")}
+              />
             </div>
             <Button onClick={handleAddMember} disabled={isSubmitting}>
               {isSubmitting ? t("Saving...") : t("Add Family Member")}
@@ -714,18 +704,13 @@ export default function FamilyManagement() {
           <TabsContent value="marriage" className="space-y-4 max-w-2xl">
             <div>
               <Label>{t("Family Head (Groom)")} *</Label>
-              <Select value={marriageHeadId} onValueChange={setMarriageHeadId}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t("Select family head")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {children.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.fullName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={marriageHeadId}
+                onChange={setMarriageHeadId}
+                options={children.map((c) => ({ value: c.id, label: c.fullName }))}
+                placeholder={t("Select family head")}
+                searchPlaceholder={t("Search children...")}
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -820,18 +805,13 @@ export default function FamilyManagement() {
             <div>
               <Label>{promoteType === "child" ? t("Child Id") : t("Family Member Id")} *</Label>
               {promoteType === "child" ? (
-                <Select value={promoteId} onValueChange={setPromoteId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("Select child")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {children.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={promoteId}
+                  onChange={setPromoteId}
+                  options={children.map((c) => ({ value: c.id, label: c.fullName }))}
+                  placeholder={t("Select child")}
+                  searchPlaceholder={t("Search children...")}
+                />
               ) : (
                 <Input value={promoteId} onChange={(e) => setPromoteId(e.target.value)} />
               )}

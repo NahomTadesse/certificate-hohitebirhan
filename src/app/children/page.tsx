@@ -4,6 +4,10 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
+import PhoneInput from "@/components/PhoneInput";
+import { getPhoneValidationError } from "@/utils/phone";
+import SearchableSelect from "@/components/SearchableSelect";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Users,
   Plus,
@@ -37,6 +41,7 @@ import {
   Printer,
   Download,
   MoreVertical,
+  Power,
 } from "lucide-react";
 import { useRef } from "react";
 import { useReactToPrint } from "react-to-print";
@@ -90,18 +95,20 @@ import DashboardLayout from "../dashboard/layout";
 import {
   fetchChildren,
   createChild,
+  updateChild,
   changeFather,
   deleteChild,
+  deactivateChild,
   Child,
 } from "@/services/childrenService";
-import { fetchFathersForDropdown, Father } from "@/services/fatherService";
+import { fetchFathersForDropdown, FatherDropdownOption } from "@/services/fatherService";
 import { fetchFatherTransfersByChild } from "@/services/fatherTransferService";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 
 export default function ChildrenManagement() {
   const [children, setChildren] = useState<Child[]>([]);
-  const [fathers, setFathers] = useState<Father[]>([]);
+  const [fathers, setFathers] = useState<FatherDropdownOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -110,6 +117,7 @@ export default function ChildrenManagement() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isChangeFatherDialogOpen, setIsChangeFatherDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeactivateDialogOpen, setIsDeactivateDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [transferHistory, setTransferHistory] = useState<any[]>([]);
@@ -180,14 +188,21 @@ export default function ChildrenManagement() {
   };
 
   const [formState, setFormState] = useState({
+    prefix: "",
     firstName: "",
     middleName: "",
     lastName: "",
+    christianName: "",
+    motherName: "",
+    email: "",
     phoneNumber: "",
     dateOfBirth: "",
     gender: "",
     fatherId: "",
   });
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
+  const [activeChildTab, setActiveChildTab] = useState("personal");
 
   const [changeFatherState, setChangeFatherState] = useState({
     newFatherId: "",
@@ -428,6 +443,15 @@ export default function ChildrenManagement() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
+              onClick={() => {
+                setSelectedChild(row.original);
+                setIsDeactivateDialogOpen(true);
+              }}
+            >
+              <Power className="h-4 w-4 mr-2" />
+              {row.original.active ? t("Deactivate") : t("Activate")}
+            </DropdownMenuItem>
+            <DropdownMenuItem
               className="text-red-600 focus:text-red-600"
               onClick={() => {
                 setSelectedChild(row.original);
@@ -444,16 +468,28 @@ export default function ChildrenManagement() {
 
   const handleAdd = () => {
     setFormState({
+      prefix: "",
       firstName: "",
       middleName: "",
       lastName: "",
+      christianName: "",
+      motherName: "",
+      email: "",
       phoneNumber: "",
       dateOfBirth: "",
       gender: "",
       fatherId: "",
     });
+    setProfileImageFile(null);
+    setProfileImagePreview(null);
+    setActiveChildTab("personal");
     setFormErrors({});
     setIsDialogOpen(true);
+  };
+
+  const handleProfileImageChange = (file: File | null) => {
+    setProfileImageFile(file);
+    setProfileImagePreview(file ? URL.createObjectURL(file) : null);
   };
 
   const validateFormState = () => {
@@ -463,6 +499,11 @@ export default function ChildrenManagement() {
     if (!formState.dateOfBirth) errors.dateOfBirth = t("Date of birth is required");
     if (!formState.gender) errors.gender = t("Gender is required");
     if (!formState.fatherId) errors.fatherId = t("Please select a father");
+    if (formState.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email)) {
+      errors.email = t("Enter a valid email address");
+    }
+    const phoneError = getPhoneValidationError(formState.phoneNumber);
+    if (phoneError) errors.phoneNumber = phoneError;
     return errors;
   };
 
@@ -470,6 +511,9 @@ export default function ChildrenManagement() {
     const errors = validateFormState();
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) {
+      const personalFields = ["firstName", "lastName", "dateOfBirth", "gender"];
+      if (personalFields.some((f) => errors[f])) setActiveChildTab("personal");
+      else setActiveChildTab("family");
       toast.error(t("Please fill all required fields"));
       return;
     }
@@ -477,7 +521,7 @@ export default function ChildrenManagement() {
     setIsSubmitting(true);
 
     try {
-      await createChild(formState);
+      await createChild(formState, profileImageFile);
       toast.success(t("Child registered successfully!"));
       await loadData();
       setIsDialogOpen(false);
@@ -522,6 +566,26 @@ export default function ChildrenManagement() {
     } finally {
       setIsSubmitting(false);
       setIsDeleteDialogOpen(false);
+    }
+  };
+
+  const handleToggleActive = async () => {
+    if (!selectedChild) return;
+    setIsSubmitting(true);
+    try {
+      if (selectedChild.active) {
+        await deactivateChild(selectedChild.id);
+        toast.success(t("Child deactivated successfully!"));
+      } else {
+        await updateChild(selectedChild.id, { ...selectedChild });
+        toast.success(t("Child activated successfully!"));
+      }
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.message || t("Operation failed"));
+    } finally {
+      setIsSubmitting(false);
+      setIsDeactivateDialogOpen(false);
     }
   };
 
@@ -681,7 +745,6 @@ export default function ChildrenManagement() {
                                 <TableRow>
                                   <TableHead>{t("Name")}</TableHead>
                                   <TableHead>{t("Relation")}</TableHead>
-                                  <TableHead>{t("Existing Child ID")}</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -691,7 +754,6 @@ export default function ChildrenManagement() {
                                     <TableCell>
                                       <Badge variant="outline">{member.relationType}</Badge>
                                     </TableCell>
-                                    <TableCell>{member.existingChildId || "-"}</TableCell>
                                   </TableRow>
                                 ))}
                               </TableBody>
@@ -782,138 +844,203 @@ export default function ChildrenManagement() {
 
         {/* Add Child Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl">{t("Register New Child")}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+            <Tabs value={activeChildTab} onValueChange={setActiveChildTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="personal">{t("Personal Info")}</TabsTrigger>
+                <TabsTrigger value="family">{t("Family")}</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="personal" className="space-y-4 py-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 rounded-full bg-muted overflow-hidden flex items-center justify-center shrink-0">
+                    {profileImagePreview ? (
+                      <img src={profileImagePreview} alt="Preview" className="h-full w-full object-cover" />
+                    ) : (
+                      <UserRound className="h-8 w-8 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <Label>{t("Profile Image")}</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleProfileImageChange(e.target.files?.[0] || null)}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label>{t("Prefix")}</Label>
+                    <Select value={formState.prefix} onValueChange={(v) => setFormState({ ...formState, prefix: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t("None")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Ato">Ato</SelectItem>
+                        <SelectItem value="W/ro">W/ro</SelectItem>
+                        <SelectItem value="W/rt">W/rt</SelectItem>
+                        <SelectItem value="Kes">Kes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2">
+                    <Label>{t("First Name")} *</Label>
+                    <Input
+                      value={formState.firstName}
+                      onChange={(e) => {
+                        setFormState({ ...formState, firstName: e.target.value });
+                        if (formErrors.firstName) setFormErrors({ ...formErrors, firstName: "" });
+                      }}
+                      placeholder="First name"
+                      aria-invalid={!!formErrors.firstName}
+                      className={formErrors.firstName ? "border-destructive focus-visible:ring-destructive" : ""}
+                    />
+                    {formErrors.firstName && (
+                      <p className="text-xs text-destructive mt-1">{formErrors.firstName}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label>{t("Middle Name")}</Label>
+                    <Input
+                      value={formState.middleName}
+                      onChange={(e) => setFormState({ ...formState, middleName: e.target.value })}
+                      placeholder="Middle name"
+                    />
+                  </div>
+                </div>
                 <div>
-                  <Label>{t("First Name")} *</Label>
+                  <Label>{t("Last Name")} *</Label>
                   <Input
-                    value={formState.firstName}
+                    value={formState.lastName}
                     onChange={(e) => {
-                      setFormState({ ...formState, firstName: e.target.value });
-                      if (formErrors.firstName) setFormErrors({ ...formErrors, firstName: "" });
+                      setFormState({ ...formState, lastName: e.target.value });
+                      if (formErrors.lastName) setFormErrors({ ...formErrors, lastName: "" });
                     }}
-                    placeholder="First name"
-                    aria-invalid={!!formErrors.firstName}
-                    className={formErrors.firstName ? "border-destructive focus-visible:ring-destructive" : ""}
+                    placeholder="Last name"
+                    aria-invalid={!!formErrors.lastName}
+                    className={formErrors.lastName ? "border-destructive focus-visible:ring-destructive" : ""}
                   />
-                  {formErrors.firstName && (
-                    <p className="text-xs text-destructive mt-1">{formErrors.firstName}</p>
+                  {formErrors.lastName && (
+                    <p className="text-xs text-destructive mt-1">{formErrors.lastName}</p>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t("Christian Name")}</Label>
+                    <Input
+                      value={formState.christianName}
+                      onChange={(e) => setFormState({ ...formState, christianName: e.target.value })}
+                      placeholder={t("Christian name")}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("Mother's Name")}</Label>
+                    <Input
+                      value={formState.motherName}
+                      onChange={(e) => setFormState({ ...formState, motherName: e.target.value })}
+                      placeholder={t("Mother's name")}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>{t("Date of Birth")} *</Label>
+                  <Input
+                    type="date"
+                    value={formState.dateOfBirth}
+                    onChange={(e) => {
+                      setFormState({ ...formState, dateOfBirth: e.target.value });
+                      if (formErrors.dateOfBirth) setFormErrors({ ...formErrors, dateOfBirth: "" });
+                    }}
+                    aria-invalid={!!formErrors.dateOfBirth}
+                    className={formErrors.dateOfBirth ? "border-destructive focus-visible:ring-destructive" : ""}
+                  />
+                  {formErrors.dateOfBirth && (
+                    <p className="text-xs text-destructive mt-1">{formErrors.dateOfBirth}</p>
                   )}
                 </div>
                 <div>
-                  <Label>{t("Middle Name")}</Label>
-                  <Input
-                    value={formState.middleName}
-                    onChange={(e) => setFormState({ ...formState, middleName: e.target.value })}
-                    placeholder="Middle name"
-                  />
+                  <Label>{t("Gender")} *</Label>
+                  <Select
+                    value={formState.gender}
+                    onValueChange={(v) => {
+                      setFormState({ ...formState, gender: v });
+                      if (formErrors.gender) setFormErrors({ ...formErrors, gender: "" });
+                    }}
+                  >
+                    <SelectTrigger className={formErrors.gender ? "border-destructive focus-visible:ring-destructive" : ""}>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="MALE">Male</SelectItem>
+                      <SelectItem value="FEMALE">Female</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {formErrors.gender && (
+                    <p className="text-xs text-destructive mt-1">{formErrors.gender}</p>
+                  )}
                 </div>
-              </div>
-              <div>
-                <Label>{t("Last Name")} *</Label>
-                <Input
-                  value={formState.lastName}
-                  onChange={(e) => {
-                    setFormState({ ...formState, lastName: e.target.value });
-                    if (formErrors.lastName) setFormErrors({ ...formErrors, lastName: "" });
-                  }}
-                  placeholder="Last name"
-                  aria-invalid={!!formErrors.lastName}
-                  className={formErrors.lastName ? "border-destructive focus-visible:ring-destructive" : ""}
-                />
-                {formErrors.lastName && (
-                  <p className="text-xs text-destructive mt-1">{formErrors.lastName}</p>
-                )}
-              </div>
-              <div>
-                <Label>{t("Phone Number")}</Label>
-                <Input
-                  type="tel"
+              </TabsContent>
+
+              <TabsContent value="family" className="space-y-4 py-4">
+                <div>
+                  <Label>{t("Email")}</Label>
+                  <Input
+                    type="email"
+                    value={formState.email}
+                    onChange={(e) => {
+                      setFormState({ ...formState, email: e.target.value });
+                      if (formErrors.email) setFormErrors({ ...formErrors, email: "" });
+                    }}
+                    placeholder={t("Email (optional)")}
+                    aria-invalid={!!formErrors.email}
+                    className={formErrors.email ? "border-destructive focus-visible:ring-destructive" : ""}
+                  />
+                  {formErrors.email && <p className="text-xs text-destructive mt-1">{formErrors.email}</p>}
+                </div>
+                <PhoneInput
+                  label={t("Phone Number")}
                   value={formState.phoneNumber}
-                  onChange={(e) => setFormState({ ...formState, phoneNumber: e.target.value })}
-                  placeholder="Phone number"
+                  onChange={(v) => setFormState({ ...formState, phoneNumber: v })}
                 />
-              </div>
-              <div>
-                <Label>{t("Date of Birth")} *</Label>
-                <Input
-                  type="date"
-                  value={formState.dateOfBirth}
-                  onChange={(e) => {
-                    setFormState({ ...formState, dateOfBirth: e.target.value });
-                    if (formErrors.dateOfBirth) setFormErrors({ ...formErrors, dateOfBirth: "" });
-                  }}
-                  aria-invalid={!!formErrors.dateOfBirth}
-                  className={formErrors.dateOfBirth ? "border-destructive focus-visible:ring-destructive" : ""}
-                />
-                {formErrors.dateOfBirth && (
-                  <p className="text-xs text-destructive mt-1">{formErrors.dateOfBirth}</p>
-                )}
-              </div>
-              <div>
-                <Label>{t("Gender")} *</Label>
-                <Select
-                  value={formState.gender}
-                  onValueChange={(v) => {
-                    setFormState({ ...formState, gender: v });
-                    if (formErrors.gender) setFormErrors({ ...formErrors, gender: "" });
-                  }}
-                >
-                  <SelectTrigger className={formErrors.gender ? "border-destructive focus-visible:ring-destructive" : ""}>
-                    <SelectValue placeholder="Select gender" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MALE">Male</SelectItem>
-                    <SelectItem value="FEMALE">Female</SelectItem>
-                  </SelectContent>
-                </Select>
-                {formErrors.gender && (
-                  <p className="text-xs text-destructive mt-1">{formErrors.gender}</p>
-                )}
-              </div>
-              <div>
-                <Label>{t("Father")} *</Label>
-                <Select
-                  value={formState.fatherId}
-                  onValueChange={(v) => {
-                    setFormState({ ...formState, fatherId: v });
-                    if (formErrors.fatherId) setFormErrors({ ...formErrors, fatherId: "" });
-                  }}
-                >
-                  <SelectTrigger className={formErrors.fatherId ? "border-destructive focus-visible:ring-destructive" : ""}>
-                    <SelectValue placeholder="Select father" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {fathers && fathers.length > 0 ? (
-                      fathers.map((father) => (
-                        <SelectItem key={father.id} value={father.id}>
-                          {father.firstName} {father.middleName || ''} {father.lastName}
-                          {father.churchName ? ` - ${father.churchName}` : ''}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="no-fathers" disabled className="text-muted-foreground">
-                        No fathers available
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-                {formErrors.fatherId && (
-                  <p className="text-xs text-destructive mt-1">{formErrors.fatherId}</p>
-                )}
-              </div>
-            </div>
+                <div>
+                  <Label>{t("Father")} *</Label>
+                  <SearchableSelect
+                    value={formState.fatherId}
+                    onChange={(v) => {
+                      setFormState({ ...formState, fatherId: v });
+                      if (formErrors.fatherId) setFormErrors({ ...formErrors, fatherId: "" });
+                    }}
+                    options={(fathers || []).map((father) => ({
+                      value: father.id,
+                      label: father.fullName || "Unknown",
+                    }))}
+                    placeholder={t("Select father")}
+                    searchPlaceholder={t("Search fathers...")}
+                    className={formErrors.fatherId ? "border-destructive focus-visible:ring-destructive" : ""}
+                  />
+                  {formErrors.fatherId && (
+                    <p className="text-xs text-destructive mt-1">{formErrors.fatherId}</p>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
                 {t("Cancel")}
               </Button>
-              <Button onClick={handleSubmit} disabled={isSubmitting}>
-                {isSubmitting ? t("Saving...") : t("Register")}
-              </Button>
+              {activeChildTab === "personal" ? (
+                <Button type="button" onClick={() => setActiveChildTab("family")}>
+                  {t("Next")}
+                </Button>
+              ) : (
+                <Button onClick={handleSubmit} disabled={isSubmitting}>
+                  {isSubmitting ? t("Saving...") : t("Register")}
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -934,28 +1061,16 @@ export default function ChildrenManagement() {
               </div>
               <div>
                 <Label>{t("New Father")} *</Label>
-                <Select
+                <SearchableSelect
                   value={changeFatherState.newFatherId}
-                  onValueChange={(v) => setChangeFatherState({ ...changeFatherState, newFatherId: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select new father" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {fathers && fathers.length > 0 ? (
-                      fathers.map((father) => (
-                        <SelectItem key={father.id} value={father.id}>
-                          {father.firstName} {father.middleName || ''} {father.lastName}
-                          {father.churchName ? ` - ${father.churchName}` : ''}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="no-fathers" disabled className="text-muted-foreground">
-                        No fathers available
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setChangeFatherState({ ...changeFatherState, newFatherId: v })}
+                  options={(fathers || []).map((father) => ({
+                    value: father.id,
+                    label: father.fullName || "Unknown",
+                  }))}
+                  placeholder={t("Select new father")}
+                  searchPlaceholder={t("Search fathers...")}
+                />
               </div>
               <div>
                 <Label>{t("Reason")} *</Label>
@@ -1001,7 +1116,13 @@ export default function ChildrenManagement() {
                 {transferHistory.map((tr: any, idx: number) => (
                   <div key={tr.id || idx} className="bg-muted p-3 rounded-lg text-sm space-y-1">
                     <p><strong>{t("Reason")}:</strong> {tr.reason || "-"}</p>
-                    <p><strong>{t("New Father ID")}:</strong> {tr.newFatherId || "-"}</p>
+                    <p>
+                      <strong>{t("New Father")}:</strong>{" "}
+                      {(() => {
+                        const f = fathers?.find((f) => f.id === tr.newFatherId);
+                        return f?.fullName || tr.newFatherId || "-";
+                      })()}
+                    </p>
                     {tr.transferDate && (
                       <p><strong>{t("Date")}:</strong> {new Date(tr.transferDate).toLocaleString()}</p>
                     )}
@@ -1017,13 +1138,13 @@ export default function ChildrenManagement() {
 
         {/* Delete Confirmation Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>{t("Delete Child?")}</DialogTitle>
             </DialogHeader>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               {t("Are you sure you want to delete")} <strong>{selectedChild?.firstName} {selectedChild?.lastName}</strong>?
-              {t("This action cannot be undone.")}
+              {" "}{t("This action cannot be undone.")}
             </p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
@@ -1031,6 +1152,39 @@ export default function ChildrenManagement() {
               </Button>
               <Button variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
                 {isSubmitting ? t("Deleting...") : t("Delete")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Activate / Deactivate Dialog */}
+        <Dialog open={isDeactivateDialogOpen} onOpenChange={setIsDeactivateDialogOpen}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>
+                {selectedChild?.active ? t("Deactivate Child?") : t("Activate Child?")}
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-muted-foreground text-sm">
+              {selectedChild?.active
+                ? t("Are you sure you want to deactivate")
+                : t("Are you sure you want to activate")}{" "}
+              <strong>{selectedChild?.firstName} {selectedChild?.lastName}</strong>?
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeactivateDialogOpen(false)}>
+                {t("Cancel")}
+              </Button>
+              <Button
+                variant={selectedChild?.active ? "destructive" : "default"}
+                onClick={handleToggleActive}
+                disabled={isSubmitting}
+              >
+                {isSubmitting
+                  ? t("Saving...")
+                  : selectedChild?.active
+                  ? t("Deactivate")
+                  : t("Activate")}
               </Button>
             </DialogFooter>
           </DialogContent>
