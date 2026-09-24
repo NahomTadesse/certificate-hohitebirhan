@@ -10,10 +10,9 @@ current Swagger spec (`certificate-api.hohitebirhan.com`), so the backend needs 
 - `UserDetailDTO` (returned by `/api/v1/user/all/paginated`) needs a `status` field so the
   Users table can show/toggle Active vs Blocked. Today the DTO only returns `role`, not `status`,
   even though `UpdateUserDTO` accepts a status on write.
-- `/api/v1/auth/change-password` does not exist in the Swagger spec at all. The frontend now
-  calls `POST /api/v1/auth/change-password` with `{ userId, oldPassword, newPassword }`
-  (mirroring `ChangePasswordDTO`). Please add this endpoint, or tell us the real path if one
-  already exists under a different name.
+- ~~`/api/v1/auth/change-password` does not exist~~ **RESOLVED (2026-09-24 Swagger update):**
+  this endpoint is now present in the Swagger spec and matches the frontend's existing call
+  (`{ userId, oldPassword, newPassword }` in `profileService.ts`). No further action needed.
 
 ## 2. Father (father-controller)
 - `FatherCreateRequestDTO` needs `christianName: string` and `motherName: string`.
