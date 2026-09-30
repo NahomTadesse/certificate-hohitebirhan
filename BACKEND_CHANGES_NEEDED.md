@@ -1,5 +1,35 @@
 # Backend Changes Needed
 
+## 2026-09-30 update: name prefixes, photos, ID/certificate photos
+
+Items the frontend now expects but that are **not in the current Swagger**:
+
+### A. Name prefixes (name-prefix-controller)
+The Swagger only has `GET /api/v1/name-prefixes`, `POST /api/v1/name-prefixes`,
+`GET /api/v1/name-prefixes/for-gender/{gender}` and `PATCH /api/v1/name-prefixes/{id}/deactivate`.
+The new **Name Prefixes** menu page is fully wired, but two actions call endpoints that do not exist yet:
+- `PUT /api/v1/name-prefixes/{id}` (body = `NamePrefixRequestDTO`) - needed for **Edit**.
+- `PATCH /api/v1/name-prefixes/{id}/activate` - needed to **re-activate** a deactivated prefix.
+Until these are added, Edit and Activate will return an error toast; Add, list and Deactivate work.
+
+### B. Father photo
+`FatherResponseDTO` has no photo field (only `documents[]`). The frontend uploads the photo as a
+document with `documentTypes = PROFILE_PHOTO` and displays the newest image document.
+Cleaner fix: add `profileImageUrl` to `FatherResponseDTO` and a `profileImage` multipart part to
+`POST/PUT /api/fathers` (same as the child endpoints). The frontend already reads `profileImageUrl`
+first when it is present, so no frontend change is needed once you add it.
+
+### C. Child activate (still open, from before)
+No `PATCH /api/children/{id}/activate`. Activate in the UI still cannot really re-activate.
+
+### D. Other things noticed while testing with your sample data
+- `qrLink` comes back as `http://localhost:8080/api/children/{id}` - the backend's public base URL
+  setting is wrong for production (and the QR image encodes it).
+- `GET /api/children/search` and `GET /api/fathers/search` are GET in the Swagger. The frontend now tries
+  GET (query params `name`, `gender`, ...) and falls back to the old POST-with-body if the server answers 404/405.
+
+---
+
 While implementing the requested fixes, the frontend was updated to send the fields below,
 matching the naming style already used in your Swagger. None of these fields exist in the
 current Swagger spec (`certificate-api.hohitebirhan.com`), so the backend needs to accept

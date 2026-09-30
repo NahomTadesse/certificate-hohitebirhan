@@ -27,6 +27,7 @@ import {
   Cross,
   Users2,
   ShieldCheck,
+  BadgeCheck,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -116,6 +117,14 @@ const baseMenu: MenuSection[] = [
         path: "family",
         subMenu: [
           { label: "Family Management", path: "family", type: "view" },
+        ],
+      },
+      {
+        label: "Name Prefixes",
+        icon: BadgeCheck,
+        path: "name-prefixes",
+        subMenu: [
+          { label: "Prefix Management", path: "name-prefixes", type: "view" },
         ],
       },
     

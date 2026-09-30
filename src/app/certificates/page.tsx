@@ -48,7 +48,9 @@ import {
   DeathRecord,
   DeathRecordRequestDTO,
 } from "@/services/deathRecordService";
-import { fetchChildrenForDropdown } from "@/services/childrenService";
+import { fetchChildrenForDropdown, ChildDropdownOption } from "@/services/childrenService";
+import PhotoAvatar from "@/components/PhotoAvatar";
+import { resolveImageUrl } from "@/utils/imageUrl";
 import { fetchChurchesForDropdown } from "@/services/churchService";
 import { fetchFathersForDropdown } from "@/services/fatherService";
 import { useTranslation } from "react-i18next";
@@ -69,11 +71,31 @@ const certificateOptions: { value: CertificateType; label: string; icon: any; co
   { value: "DEATH", label: "Death Certificate", icon: Cross, color: "text-cyan-800 bg-cyan-100" },
 ];
 
+// Passport-style photo box used on the printed certificate. Falls back to a labelled
+// empty frame when the person has no photo (or the image can't be loaded).
+function CertPhoto({ src, label }: { src?: string | null; label: string }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  return (
+    <div
+      className="w-20 h-24 border flex items-center justify-center text-[9px] text-center text-muted-foreground overflow-hidden shrink-0 bg-white"
+      style={{ borderColor: CERT_COLOR }}
+    >
+      {src && !failed ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={label} className="h-full w-full object-cover" onError={() => setFailed(true)} />
+      ) : (
+        label
+      )}
+    </div>
+  );
+}
+
 function CertificatesPageWr() {
   const { t, i18n } = useTranslation();
   const certLang = i18n.language === "am" ? "am" : "en";
   const searchParams = useSearchParams();
-  const [children, setChildren] = useState<{ id: string; fullName: string }[]>([]);
+  const [children, setChildren] = useState<ChildDropdownOption[]>([]);
   const [loadingChildren, setLoadingChildren] = useState(true);
   const [childId, setChildId] = useState(searchParams?.get("childId") || "");
   const [type, setType] = useState<CertificateType>("BAPTISM");
@@ -81,6 +103,8 @@ function CertificatesPageWr() {
   const [generatedCert, setGeneratedCert] = useState<{
     type: CertificateType;
     data: any; // raw response payload from the issue endpoint (fields differ per type)
+    // photos captured at generation time (so changing the dropdowns afterwards doesn't alter a printed preview)
+    photos?: { main?: string | null; groom?: string | null; bride?: string | null };
   } | null>(null);
 
   // --- Churches dropdown (shared by the generate form and the records browser) ---
@@ -134,6 +158,7 @@ function CertificatesPageWr() {
   }, [loadChildren]);
 
   const nameOf = (id: string) => children.find((c) => c.id === id)?.fullName || "Unknown";
+  const photoOf = (id: string) => resolveImageUrl(children.find((c) => c.id === id)?.profileImageUrl);
 
   const handleGenerate = async () => {
     if (!childId) {
@@ -192,7 +217,13 @@ function CertificatesPageWr() {
         issued = res?.data;
       }
 
-      setGeneratedCert({ type, data: issued || {} });
+      const photos =
+        type === "WEDDING"
+          ? { groom: photoOf(childId), bride: photoOf(brideChildId) }
+          : type === "DEATH" && deathMemberType !== "CHILD"
+          ? {}
+          : { main: photoOf(childId) };
+      setGeneratedCert({ type, data: issued || {}, photos });
       toast.success(t("Certificate generated successfully!"));
       loadRecords();
     } catch (err: any) {
@@ -402,6 +433,14 @@ function CertificatesPageWr() {
                 searchPlaceholder={t("Search children...")}
                 disabled={loadingChildren}
               />
+              {childId && (
+                <div className="flex items-center gap-2 mt-2">
+                  <PhotoAvatar src={photoOf(childId)} alt={nameOf(childId)} size="h-12 w-12" />
+                  <span className="text-xs text-muted-foreground">
+                    {photoOf(childId) ? t("This photo will appear on the certificate") : t("No photo on file")}
+                  </span>
+                </div>
+              )}
             </div>
 
             {type === "WEDDING" && (
@@ -415,6 +454,14 @@ function CertificatesPageWr() {
                   searchPlaceholder={t("Search children...")}
                   disabled={loadingChildren}
                 />
+                {brideChildId && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <PhotoAvatar src={photoOf(brideChildId)} alt={nameOf(brideChildId)} size="h-12 w-12" />
+                    <span className="text-xs text-muted-foreground">
+                      {photoOf(brideChildId) ? t("This photo will appear on the certificate") : t("No photo on file")}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -712,9 +759,13 @@ function CertificatesPageWr() {
             >
               <div className="border-2 p-6" style={{ borderColor: CERT_COLOR }}>
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex flex-col items-center w-20 pt-1">
-                    <Award className="h-10 w-10" style={{ color: CERT_COLOR }} />
-                  </div>
+                  {generatedCert.type === "WEDDING" ? (
+                    <CertPhoto src={generatedCert.photos?.groom} label={t("Groom")} />
+                  ) : (
+                    <div className="flex flex-col items-center w-20 pt-1">
+                      <Award className="h-10 w-10" style={{ color: CERT_COLOR }} />
+                    </div>
+                  )}
                   <div className="flex-1 text-center">
                     {certLang === "am" ? (
                       <p className="text-sm font-bold" style={{ color: CERT_COLOR }}>
@@ -729,12 +780,11 @@ function CertificatesPageWr() {
                       {t(certificateOptions.find((o) => o.value === generatedCert.type)?.label || "Certificate")}
                     </p>
                   </div>
-                  <div
-                    className="w-16 h-20 border flex items-center justify-center text-[9px] text-center px-1 text-muted-foreground"
-                    style={{ borderColor: CERT_COLOR }}
-                  >
-                    {t("Photo")}
-                  </div>
+                  {generatedCert.type === "WEDDING" ? (
+                    <CertPhoto src={generatedCert.photos?.bride} label={t("Bride")} />
+                  ) : (
+                    <CertPhoto src={generatedCert.photos?.main} label={t("Photo")} />
+                  )}
                 </div>
 
                 <div className="text-right text-xs mt-2" style={{ color: CERT_COLOR }}>

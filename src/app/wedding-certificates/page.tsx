@@ -44,7 +44,8 @@ import {
 } from "@/services/weddingCertificateService";
 import { fetchChurchesForDropdown } from "@/services/churchService";
 import { fetchFathersForDropdown } from "@/services/fatherService";
-import { fetchChildrenForDropdown } from "@/services/childrenService";
+import { fetchChildrenForDropdown, ChildDropdownOption } from "@/services/childrenService";
+import PhotoAvatar from "@/components/PhotoAvatar";
 import SearchableSelect from "@/components/SearchableSelect";
 import { useTranslation } from "react-i18next";
 
@@ -80,7 +81,7 @@ export default function WeddingCertificatesManagement() {
   const [churches, setChurches] = useState<{ id: string; name: string }[]>([]);
   const [churchId, setChurchId] = useState("");
   const [priests, setPriests] = useState<{ id: string; fullName: string }[]>([]);
-  const [children, setChildren] = useState<{ id: string; fullName: string }[]>([]);
+  const [children, setChildren] = useState<ChildDropdownOption[]>([]);
 
   const [records, setRecords] = useState<WeddingRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -372,6 +373,14 @@ export default function WeddingCertificatesManagement() {
                   placeholder={t("Select groom (optional)")}
                   searchPlaceholder={t("Search children...")}
                 />
+                {formState.groomChildId && (
+                  <PhotoAvatar
+                    className="mt-2"
+                    size="h-14 w-14"
+                    src={children.find((c) => c.id === formState.groomChildId)?.profileImageUrl}
+                    alt={formState.groomFullName}
+                  />
+                )}
               </div>
               <div>
                 <Label>{t("Groom Full Name")} *</Label>
@@ -403,6 +412,14 @@ export default function WeddingCertificatesManagement() {
                   placeholder={t("Select bride (optional)")}
                   searchPlaceholder={t("Search children...")}
                 />
+                {formState.brideChildId && (
+                  <PhotoAvatar
+                    className="mt-2"
+                    size="h-14 w-14"
+                    src={children.find((c) => c.id === formState.brideChildId)?.profileImageUrl}
+                    alt={formState.brideFullName}
+                  />
+                )}
               </div>
               <div>
                 <Label>{t("Bride Full Name")} *</Label>

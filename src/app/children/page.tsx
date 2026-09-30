@@ -103,6 +103,13 @@ import {
 } from "@/services/childrenService";
 import { fetchFathersForDropdown, FatherDropdownOption } from "@/services/fatherService";
 import { fetchFatherTransfersByChild } from "@/services/fatherTransferService";
+import {
+  fetchNamePrefixesForGender,
+  prefixDisplay,
+  NamePrefix,
+} from "@/services/namePrefixService";
+import PhotoAvatar from "@/components/PhotoAvatar";
+import { resolveImageUrl } from "@/utils/imageUrl";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 
@@ -128,7 +135,17 @@ export default function ChildrenManagement() {
   const [idCardChild, setIdCardChild] = useState<Child | null>(null);
   const [idCardPhoto, setIdCardPhoto] = useState<string | null>(null);
   const idCardRef = useRef<HTMLDivElement>(null);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [prefixOptions, setPrefixOptions] = useState<NamePrefix[]>([]);
+
+  // name shown with its honorific, e.g. "Ato Abebe Kebede"
+  const withPrefix = (c?: Partial<Child> | null) => {
+    if (!c) return "";
+    const name =
+      c.fullName || `${c.firstName || ""} ${c.middleName || ""} ${c.lastName || ""}`.trim();
+    const label = c.namePrefixLabel;
+    return label && !name.toLowerCase().startsWith(label.toLowerCase()) ? `${label} ${name}` : name;
+  };
 
   const handlePrintIdCard = useReactToPrint({
     contentRef: idCardRef,
@@ -142,6 +159,9 @@ export default function ChildrenManagement() {
     setIdCardPhoto(null);
     setIsIdCardDialogOpen(true);
   };
+
+  // Photo used on the ID: the uploaded override if any, otherwise the child's profile photo
+  const idPhotoSrc = idCardPhoto || resolveImageUrl(idCardChild?.profileImageUrl);
 
   const handleIdPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -188,7 +208,7 @@ export default function ChildrenManagement() {
   };
 
   const [formState, setFormState] = useState({
-    prefix: "",
+    namePrefixId: "",
     firstName: "",
     middleName: "",
     lastName: "",
@@ -272,6 +292,25 @@ export default function ChildrenManagement() {
     loadData();
   }, [loadData]);
 
+  // Prefix choices come from the API and depend on the selected gender
+  useEffect(() => {
+    if (!formState.gender) {
+      setPrefixOptions([]);
+      return;
+    }
+    let cancelled = false;
+    fetchNamePrefixesForGender(formState.gender)
+      .then((list) => {
+        if (!cancelled) setPrefixOptions(list.filter((p) => p.active !== false));
+      })
+      .catch(() => {
+        if (!cancelled) setPrefixOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [formState.gender]);
+
   // Debounce the search box, then ask the backend to filter the list
   // (a local filter below still applies as a fallback in case the API
   // doesn't yet honor the `search` query param).
@@ -338,12 +377,14 @@ export default function ChildrenManagement() {
       header: t("Child Name"),
       cell: ({ row }) => (
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <UserRound className="h-5 w-5 text-primary" />
-          </div>
+          <PhotoAvatar
+            src={row.original.profileImageUrl}
+            alt={row.original.fullName}
+            size="h-10 w-10"
+          />
           <div>
             <div className="font-semibold">
-              {row.original.fullName}
+              {withPrefix(row.original)}
             </div>
             {row.original.sebekaMemberId && (
               <div className="text-xs text-muted-foreground">
@@ -468,7 +509,7 @@ export default function ChildrenManagement() {
 
   const handleAdd = () => {
     setFormState({
-      prefix: "",
+      namePrefixId: "",
       firstName: "",
       middleName: "",
       lastName: "",
@@ -521,7 +562,10 @@ export default function ChildrenManagement() {
     setIsSubmitting(true);
 
     try {
-      await createChild(formState, profileImageFile);
+      await createChild(
+        { ...formState, namePrefixId: formState.namePrefixId || undefined },
+        profileImageFile
+      );
       toast.success(t("Child registered successfully!"));
       await loadData();
       setIsDialogOpen(false);
@@ -646,10 +690,22 @@ export default function ChildrenManagement() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="flex flex-col sm:flex-row gap-6">
+                      <div className="flex flex-col items-center gap-2 shrink-0">
+                        <PhotoAvatar
+                          src={selectedChild.profileImageUrl}
+                          alt={selectedChild.fullName}
+                          size="h-32 w-32"
+                          shape="square"
+                        />
+                        {!selectedChild.profileImageUrl && (
+                          <span className="text-xs text-muted-foreground">{t("No photo")}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div>
                         <Label className="text-muted-foreground">{t("Full Name")}</Label>
-                        <p className="font-semibold">{selectedChild.fullName}</p>
+                        <p className="font-semibold">{withPrefix(selectedChild)}</p>
                       </div>
                       <div>
                         <Label className="text-muted-foreground">{t("Sebeka Member ID")}</Label>
@@ -680,6 +736,7 @@ export default function ChildrenManagement() {
                       <div>
                         <Label className="text-muted-foreground">{t("Status")}</Label>
                         <div className="mt-1">{getActiveBadge(selectedChild.active || false)}</div>
+                      </div>
                       </div>
                     </div>
                   </CardContent>
@@ -872,18 +929,46 @@ export default function ChildrenManagement() {
                     />
                   </div>
                 </div>
+                <div>
+                  <Label>{t("Gender")} *</Label>
+                  <Select
+                    value={formState.gender}
+                    onValueChange={(v) => {
+                      // prefixes are gender specific, so clear the chosen one
+                      setFormState({ ...formState, gender: v, namePrefixId: "" });
+                      if (formErrors.gender) setFormErrors({ ...formErrors, gender: "" });
+                    }}
+                  >
+                    <SelectTrigger className={formErrors.gender ? "border-destructive focus-visible:ring-destructive" : ""}>
+                      <SelectValue placeholder={t("Select gender")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="MALE">{t("Male")}</SelectItem>
+                      <SelectItem value="FEMALE">{t("Female")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {formErrors.gender && (
+                    <p className="text-xs text-destructive mt-1">{formErrors.gender}</p>
+                  )}
+                </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label>{t("Prefix")}</Label>
-                    <Select value={formState.prefix} onValueChange={(v) => setFormState({ ...formState, prefix: v })}>
+                    <Select
+                      value={formState.namePrefixId || "none"}
+                      onValueChange={(v) => setFormState({ ...formState, namePrefixId: v === "none" ? "" : v })}
+                      disabled={!formState.gender}
+                    >
                       <SelectTrigger>
-                        <SelectValue placeholder={t("None")} />
+                        <SelectValue placeholder={formState.gender ? t("None") : t("Select gender first")} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Ato">Ato</SelectItem>
-                        <SelectItem value="W/ro">W/ro</SelectItem>
-                        <SelectItem value="W/rt">W/rt</SelectItem>
-                        <SelectItem value="Kes">Kes</SelectItem>
+                        <SelectItem value="none">{t("None")}</SelectItem>
+                        {prefixOptions.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {prefixDisplay(p, i18n.language)}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -960,27 +1045,6 @@ export default function ChildrenManagement() {
                   />
                   {formErrors.dateOfBirth && (
                     <p className="text-xs text-destructive mt-1">{formErrors.dateOfBirth}</p>
-                  )}
-                </div>
-                <div>
-                  <Label>{t("Gender")} *</Label>
-                  <Select
-                    value={formState.gender}
-                    onValueChange={(v) => {
-                      setFormState({ ...formState, gender: v });
-                      if (formErrors.gender) setFormErrors({ ...formErrors, gender: "" });
-                    }}
-                  >
-                    <SelectTrigger className={formErrors.gender ? "border-destructive focus-visible:ring-destructive" : ""}>
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="MALE">Male</SelectItem>
-                      <SelectItem value="FEMALE">Female</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {formErrors.gender && (
-                    <p className="text-xs text-destructive mt-1">{formErrors.gender}</p>
                   )}
                 </div>
               </TabsContent>
@@ -1203,17 +1267,17 @@ export default function ChildrenManagement() {
               <div className="space-y-4">
                 <div>
                   <Label>{t("Member Photo")}</Label>
-                  <div className="flex items-center gap-3 mt-1">
-                    {idCardPhoto && (
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    {idPhotoSrc && (
                       <img
-                        src={idCardPhoto}
+                        src={idPhotoSrc}
                         alt="preview"
                         className="h-16 w-16 rounded-full object-cover border"
                       />
                     )}
                     <label className="flex items-center gap-2 cursor-pointer text-sm text-primary border border-dashed rounded-md px-3 py-2 hover:bg-muted">
                       <Upload className="h-4 w-4" />
-                      {idCardPhoto ? t("Change Photo") : t("Upload Photo")}
+                      {idPhotoSrc ? t("Use a different photo for this ID") : t("Upload Photo")}
                       <input
                         type="file"
                         accept="image/*"
@@ -1221,7 +1285,19 @@ export default function ChildrenManagement() {
                         onChange={handleIdPhotoUpload}
                       />
                     </label>
+                    {idCardPhoto && idCardChild.profileImageUrl && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setIdCardPhoto(null)}>
+                        {t("Use profile photo")}
+                      </Button>
+                    )}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {idCardPhoto
+                      ? t("This photo is used for this ID only; the member's profile photo is not changed.")
+                      : idCardChild.profileImageUrl
+                      ? t("Using the member's profile photo.")
+                      : t("No profile photo on file - upload one for the ID.")}
+                  </p>
                 </div>
 
                 {/* Printable ID Card */}
@@ -1265,8 +1341,7 @@ export default function ChildrenManagement() {
                       <div className="flex-1 space-y-1.5 text-sm pr-24">
                         <p>
                           <span className="font-semibold">{t("Name")}: </span>
-                          {idCardChild.fullName ||
-                            `${idCardChild.firstName || ""} ${idCardChild.middleName || ""} ${idCardChild.lastName || ""}`.trim()}
+                          {withPrefix(idCardChild)}
                         </p>
                         {(idCardChild as any).christianName && (
                           <p>
@@ -1295,9 +1370,9 @@ export default function ChildrenManagement() {
                         <p className="text-[10px] font-semibold text-muted-foreground">
                           {t("ID No")}: {(idCardChild as any).sebekaMemberId || idCardChild.id}
                         </p>
-                        {idCardPhoto ? (
+                        {idPhotoSrc ? (
                           <img
-                            src={idCardPhoto}
+                            src={idPhotoSrc}
                             alt="member"
                             className="h-20 w-20 rounded-sm object-cover border-2 border-[#4d8f96]"
                           />

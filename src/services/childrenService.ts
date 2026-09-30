@@ -2,10 +2,20 @@ import { authenticatedFetch, authenticatedFileUpload } from "./api";
 
 export interface Child {
   id: string;
-  prefix?: string; // e.g. "Ato", "W/ro", "Kes" - honorific shown before the name
+  namePrefixId?: string;
+  namePrefixLabel?: string; // honorific returned by the API, e.g. "Ato", "W/ro", "Kes"
   firstName: string;
   middleName: string;
   lastName: string;
+  sebekaMemberId?: string;
+  active?: boolean;
+  qrCode?: string | null;
+  qrLink?: string | null;
+  familyStatus?: string;
+  family?: any;
+  churchName?: string;
+  placeOfBirth?: string;
+  nationality?: string;
   christianName?: string;
   motherName?: string;
   email?: string;
@@ -22,7 +32,7 @@ export interface Child {
 }
 
 export interface CreateChildPayload {
-  prefix?: string;
+  namePrefixId?: string;
   firstName: string;
   middleName: string;
   lastName: string;
@@ -33,6 +43,8 @@ export interface CreateChildPayload {
   dateOfBirth: string;
   gender: string;
   fatherId: string;
+  placeOfBirth?: string;
+  nationality?: string;
 }
 
 export interface UpdateFatherPayload {
@@ -109,31 +121,60 @@ export interface ChildSearchFilters {
   isActive?: boolean;
 }
 
-// POST: Search children (correct endpoint per swagger - /api/children/search is a POST)
+// Search children. The current Swagger declares /api/children/search as a GET (filters as query
+// params); older backend builds accepted a POST with a JSON body. Try GET first and fall back
+// to POST when the server says the method/route isn't there.
 export const searchChildren = async (
   filters: ChildSearchFilters,
   page = 0,
   size = 10
 ): Promise<Child[]> => {
-  const response = await authenticatedFetch<any>(`/api/children/search?page=${page}&size=${size}`, {
-    method: "POST",
-    body: JSON.stringify(filters),
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") params.set(k, String(v));
   });
-  return extractChildList(response);
+  params.set("page", String(page));
+  params.set("size", String(size));
+  try {
+    const response = await authenticatedFetch<any>(`/api/children/search?${params.toString()}`);
+    return extractChildList(response);
+  } catch (err: any) {
+    if (![404, 405, 415].includes(err?.status)) throw err;
+    const response = await authenticatedFetch<any>(`/api/children/search?page=${page}&size=${size}`, {
+      method: "POST",
+      body: JSON.stringify(filters),
+    });
+    return extractChildList(response);
+  }
 };
 
-// GET: Fetch children for dropdown (simplified)
-export const fetchChildrenForDropdown = async (): Promise<{ id: string; fullName: string }[]> => {
-  const children = await fetchChildren();
+export interface ChildDropdownOption {
+  id: string;
+  fullName: string;
+  gender?: string;
+  profileImageUrl?: string; // relative path from the API - run through resolveImageUrl() to display
+  namePrefixLabel?: string;
+}
+
+// GET: Fetch children for dropdown (simplified).
+// Asks for a large page: the API defaults to 10 per page, which made every child after the
+// 10th impossible to pick in the certificate / payment / family dropdowns.
+export const fetchChildrenForDropdown = async (): Promise<ChildDropdownOption[]> => {
+  const children = await fetchChildren(undefined, 0, 1000);
   return children.map((c) => ({
     id: c.id,
     fullName: c.fullName || `${c.firstName} ${c.middleName || ""} ${c.lastName}`.trim(),
+    gender: c.gender,
+    profileImageUrl: c.profileImageUrl,
+    namePrefixLabel: c.namePrefixLabel,
   }));
 };
 
 // GET: Get single child by ID
+// (the API wraps the child in { message, success, data } - unwrap it)
 export const fetchChildById = async (id: string): Promise<Child> => {
-  return await authenticatedFetch<Child>(`/api/children/${id}`);
+  const response = await authenticatedFetch<any>(`/api/children/${id}`);
+  return (response && response.data ? response.data : response) as Child;
 };
 
 // POST: Create new child (multipart: dto + optional profileImage, per swagger)

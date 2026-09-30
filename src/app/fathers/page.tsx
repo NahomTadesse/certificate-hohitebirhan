@@ -1474,6 +1474,9 @@ import {
 } from "@/services/fatherService";
 import { fetchChurchesForDropdown } from "@/services/churchService";
 import { fetchDiocesesForDropdown } from "@/services/dioceseService";
+import { fetchNamePrefixesForGender, prefixDisplay, NamePrefix } from "@/services/namePrefixService";
+import PhotoAvatar from "@/components/PhotoAvatar";
+import { getFatherPhotoUrl } from "@/utils/imageUrl";
 import SearchableSelect from "@/components/SearchableSelect";
 import PhoneInput from "@/components/PhoneInput";
 import { getPhoneValidationError } from "@/utils/phone";
@@ -1515,7 +1518,24 @@ export default function FatherManagement() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
   const [registrationDocuments, setRegistrationDocuments] = useState<File[]>([]);
-  const { t } = useTranslation();
+  const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
+  const [prefixOptions, setPrefixOptions] = useState<NamePrefix[]>([]);
+  const { t, i18n } = useTranslation();
+
+  // name shown with its honorific, e.g. "Kes Abebe Kebede"
+  const withPrefix = (f?: Partial<Father> | null) => {
+    if (!f) return "";
+    const name =
+      f.fullName || [f.firstName, f.middleName, f.lastName].filter(Boolean).join(" ");
+    const label = f.namePrefixLabel;
+    return label && !name.toLowerCase().startsWith(label.toLowerCase()) ? `${label} ${name}` : name;
+  };
+
+  const handleProfilePhotoChange = (file: File | null) => {
+    setProfilePhoto(file);
+    setProfilePhotoPreview(file ? URL.createObjectURL(file) : null);
+  };
 
   const defaultSpiritualInfo: SpiritualInfo = {
     kinetPlace: "",
@@ -1541,6 +1561,7 @@ export default function FatherManagement() {
   };
 
   const [formState, setFormState] = useState({
+    namePrefixId: "",
     firstName: "",
     middleName: "",
     lastName: "",
@@ -1600,6 +1621,13 @@ const loadData = useCallback(async (search?: string) => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Prefix choices come from the name-prefix API (clergy use the MALE list)
+  useEffect(() => {
+    fetchNamePrefixesForGender("MALE")
+      .then((list) => setPrefixOptions(list.filter((p) => p.active !== false)))
+      .catch(() => setPrefixOptions([]));
+  }, []);
 
   // Debounce the search box, then ask the backend to filter the list
   // (a local filter below still applies as a fallback in case the API
@@ -1693,11 +1721,9 @@ const loadData = useCallback(async (search?: string) => {
       header: t("Father Name"),
       cell: ({ row }) => (
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <User className="h-5 w-5 text-primary" />
-          </div>
+          <PhotoAvatar src={getFatherPhotoUrl(row.original)} alt={row.original.fullName} size="h-10 w-10" />
           <div>
-            <div className="font-semibold">{row.original.fullName}</div>
+            <div className="font-semibold">{withPrefix(row.original)}</div>
             <div className="text-sm text-muted-foreground">ID: {row.original.id}</div>
           </div>
         </div>
@@ -1821,6 +1847,7 @@ const loadData = useCallback(async (search?: string) => {
 
   const handleAdd = () => {
     setFormState({
+      namePrefixId: "",
       firstName: "",
       middleName: "",
       lastName: "",
@@ -1838,6 +1865,7 @@ const loadData = useCallback(async (search?: string) => {
     });
     setActiveTab("basic");
     setRegistrationDocuments([]);
+    handleProfilePhotoChange(null);
     setIsDialogOpen(true);
   };
 
@@ -1945,14 +1973,29 @@ const loadData = useCallback(async (search?: string) => {
     try {
       const payload = {
         ...formState,
+        namePrefixId: formState.namePrefixId || undefined,
         christianName: formState.christianName || undefined,
         motherName: formState.motherName || undefined,
       };
-      await createFather(payload, registrationDocuments);
+      // The Swagger has no father photo field, so the photo travels as a document
+      // typed PROFILE_PHOTO; it is picked up again by getFatherPhotoUrl().
+      const files: File[] = [];
+      const types: string[] = [];
+      if (profilePhoto) {
+        const ext = (profilePhoto.name.split(".").pop() || "jpg").toLowerCase();
+        files.push(new File([profilePhoto], `profile-photo.${ext}`, { type: profilePhoto.type }));
+        types.push("PROFILE_PHOTO");
+      }
+      registrationDocuments.forEach((d) => {
+        files.push(d);
+        types.push("REGISTRATION");
+      });
+      await createFather(payload, files, files.length ? types : undefined);
       toast.success("Father registered successfully!");
       await loadData();
       setIsDialogOpen(false);
       setRegistrationDocuments([]);
+      handleProfilePhotoChange(null);
     } catch (err: any) {
       toast.error(err.message || "Operation failed");
     } finally {
@@ -2072,10 +2115,22 @@ const loadData = useCallback(async (search?: string) => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="flex flex-col sm:flex-row gap-6">
+                      <div className="flex flex-col items-center gap-2 shrink-0">
+                        <PhotoAvatar
+                          src={getFatherPhotoUrl(selectedFather)}
+                          alt={selectedFather.fullName}
+                          size="h-32 w-32"
+                          shape="square"
+                        />
+                        {!getFatherPhotoUrl(selectedFather) && (
+                          <span className="text-xs text-muted-foreground">{t("No photo")}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div>
                         <Label className="text-muted-foreground">{t("Full Name")}</Label>
-                        <p className="font-semibold text-lg">{selectedFather.fullName}</p>
+                        <p className="font-semibold text-lg">{withPrefix(selectedFather)}</p>
                       </div>
                       <div>
                         <Label className="text-muted-foreground">{t("ID")}</Label>
@@ -2102,6 +2157,7 @@ const loadData = useCallback(async (search?: string) => {
                       <div>
                         <Label className="text-muted-foreground">{t("Status")}</Label>
                         <div className="mt-1">{getStatusBadge(selectedFather.active)}</div>
+                      </div>
                       </div>
                     </div>
                   </CardContent>
@@ -2387,6 +2443,43 @@ const loadData = useCallback(async (search?: string) => {
               </TabsList>
               
               <TabsContent value="basic" className="space-y-4 py-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 rounded-full bg-muted overflow-hidden flex items-center justify-center shrink-0">
+                    {profilePhotoPreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={profilePhotoPreview} alt="Preview" className="h-full w-full object-cover" />
+                    ) : (
+                      <User className="h-8 w-8 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <Label>{t("Profile Photo")}</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleProfilePhotoChange(e.target.files?.[0] || null)}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>{t("Prefix")}</Label>
+                  <Select
+                    value={formState.namePrefixId || "none"}
+                    onValueChange={(v) => setFormState({ ...formState, namePrefixId: v === "none" ? "" : v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("None")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">{t("None")}</SelectItem>
+                      {prefixOptions.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {prefixDisplay(p, i18n.language)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>{t("First Name")} *</Label>
@@ -2427,7 +2520,7 @@ const loadData = useCallback(async (search?: string) => {
                   </div>
                 </div>
                 <div>
-                  <Label>{t("Profile / Registration Documents")}</Label>
+                  <Label>{t("Registration Documents")}</Label>
                   <Input
                     type="file"
                     multiple

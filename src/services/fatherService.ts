@@ -32,8 +32,26 @@ export interface TransferHistory {
   transferDate: string;
 }
 
+export interface FatherDocument {
+  id: string;
+  fileName?: string;
+  fileUrl?: string;
+  fileType?: string;
+  uploadedAt?: string;
+}
+
 export interface Father {
   id: string;
+  namePrefixLabel?: string; // honorific returned by the API
+  profileImageUrl?: string; // not in the Swagger yet - see getFatherPhotoUrl() fallback to documents[]
+  documents?: FatherDocument[];
+  clericalRank?: string;
+  clericalRankLabel?: string;
+  monasticismType?: string;
+  monasticName?: string;
+  dioceseName?: string;
+  christianName?: string;
+  motherName?: string;
   firstName: string;
   middleName: string;
   lastName: string;
@@ -50,6 +68,7 @@ export interface Father {
 }
 
 export interface CreateFatherPayload {
+  namePrefixId?: string;
   firstName: string;
   middleName: string;
   lastName: string;
@@ -121,20 +140,34 @@ export interface FatherSearchFilters {
   isActive?: boolean;
 }
 
-// POST: Search fathers (correct endpoint per swagger - /api/fathers/search is a POST)
+// Search fathers. The current Swagger declares /api/fathers/search as a GET (filters as query
+// params); older backend builds accepted a POST with a JSON body. Try GET first and fall back
+// to POST when the server says the method/route isn't there.
 export const searchFathers = async (
   filters: FatherSearchFilters,
   page = 0,
   size = 10
 ): Promise<PaginatedResponse<Father>> => {
-  const response = await authenticatedFetch<PaginatedResponse<Father>>(
-    `/api/fathers/search?page=${page}&size=${size}`,
-    {
-      method: "POST",
-      body: JSON.stringify(filters),
-    }
-  );
-  return response || { content: [], totalElements: 0, totalPages: 0, empty: true } as PaginatedResponse<Father>;
+  const empty = { content: [], totalElements: 0, totalPages: 0, empty: true } as PaginatedResponse<Father>;
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") params.set(k, String(v));
+  });
+  params.set("page", String(page));
+  params.set("size", String(size));
+  try {
+    const response = await authenticatedFetch<PaginatedResponse<Father>>(
+      `/api/fathers/search?${params.toString()}`
+    );
+    return response || empty;
+  } catch (err: any) {
+    if (![404, 405, 415].includes(err?.status)) throw err;
+    const response = await authenticatedFetch<PaginatedResponse<Father>>(
+      `/api/fathers/search?page=${page}&size=${size}`,
+      { method: "POST", body: JSON.stringify(filters) }
+    );
+    return response || empty;
+  }
 };
 
 // GET: Get single father by ID
@@ -156,7 +189,8 @@ export interface FatherDropdownOption {
 
 // GET: Get fathers for dropdown (simplified - extracts from paginated response)
 export const fetchFathersForDropdown = async (): Promise<FatherDropdownOption[]> => {
-  const response = await authenticatedFetch<PaginatedResponse<Father>>("/api/fathers");
+  // large page: the API defaults to 10 per page, so fathers after the 10th were missing from dropdowns
+  const response = await authenticatedFetch<PaginatedResponse<Father>>("/api/fathers?page=0&size=1000");
   
   // Check if response exists and has content
   if (response && response.content && Array.isArray(response.content)) {
