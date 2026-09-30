@@ -2461,34 +2461,34 @@ const loadData = useCallback(async (search?: string) => {
                     />
                   </div>
                 </div>
-                <div>
-                  <Label>{t("Prefix")}</Label>
-                  <Select
-                    value={formState.namePrefixId || "none"}
-                    onValueChange={(v) => setFormState({ ...formState, namePrefixId: v === "none" ? "" : v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("None")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">{t("None")}</SelectItem>
-                      {prefixOptions.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {prefixDisplay(p, i18n.language)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>{t("Prefix")}</Label>
+                    <Select
+                      value={formState.namePrefixId || "none"}
+                      onValueChange={(v) => setFormState({ ...formState, namePrefixId: v === "none" ? "" : v })}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={t("None")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">{t("None")}</SelectItem>
+                        {prefixOptions.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {prefixDisplay(p, i18n.language)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
                     <Label>{t("First Name")} *</Label>
                     <Input
                       value={formState.firstName}
                       onChange={(e) => setFormState({ ...formState, firstName: e.target.value })}
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label>{t("Middle Name")}</Label>
                     <Input
                       value={formState.middleName}
@@ -2496,22 +2496,22 @@ const loadData = useCallback(async (search?: string) => {
                     />
                   </div>
                 </div>
-                <div>
-                  <Label>{t("Last Name")} *</Label>
-                  <Input
-                    value={formState.lastName}
-                    onChange={(e) => setFormState({ ...formState, lastName: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>{t("Last Name")} *</Label>
+                    <Input
+                      value={formState.lastName}
+                      onChange={(e) => setFormState({ ...formState, lastName: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
                     <Label>{t("Christian Name")}</Label>
                     <Input
                       value={formState.christianName || ""}
                       onChange={(e) => setFormState({ ...formState, christianName: e.target.value })}
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label>{t("Mother's Name")}</Label>
                     <Input
                       value={formState.motherName || ""}
@@ -2519,52 +2519,57 @@ const loadData = useCallback(async (search?: string) => {
                     />
                   </div>
                 </div>
-                <div>
-                  <Label>{t("Registration Documents")}</Label>
-                  <Input
-                    type="file"
-                    multiple
-                    onChange={(e) => setRegistrationDocuments(Array.from(e.target.files || []))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <PhoneInput
+                    className="space-y-1.5 [&>label]:mb-0"
+                    label={t("Phone Number")}
+                    value={formState.phoneNumber}
+                    onChange={(v) => setFormState({ ...formState, phoneNumber: v })}
                   />
-                  {registrationDocuments.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {registrationDocuments.length} {t("file(s) selected")}
-                    </p>
-                  )}
+                  <div className="space-y-1.5">
+                    <Label>{t("Registration Documents")}</Label>
+                    <Input
+                      type="file"
+                      multiple
+                      onChange={(e) => setRegistrationDocuments(Array.from(e.target.files || []))}
+                    />
+                    {registrationDocuments.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {registrationDocuments.length} {t("file(s) selected")}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <PhoneInput
-                  label={t("Phone Number")}
-                  value={formState.phoneNumber}
-                  onChange={(v) => setFormState({ ...formState, phoneNumber: v })}
-                />
-                <div>
-                  <Label>{t("Church")} *</Label>
-                  <SearchableSelect
-                    value={formState.churchId}
-                    onChange={(v) => setFormState({ ...formState, churchId: v })}
-                    options={churches.map((church) => ({ value: church.id, label: church.name }))}
-                    placeholder={t("Select church")}
-                    searchPlaceholder={t("Search churches...")}
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>{t("Church")} *</Label>
+                    <SearchableSelect
+                      value={formState.churchId}
+                      onChange={(v) => setFormState({ ...formState, churchId: v })}
+                      options={churches.map((church) => ({ value: church.id, label: church.name }))}
+                      placeholder={t("Select church")}
+                      searchPlaceholder={t("Search churches...")}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{t("Diocese")}</Label>
+                    <SearchableSelect
+                      value={formState.dioceseId}
+                      onChange={(v) => setFormState({ ...formState, dioceseId: v })}
+                      options={dioceses.map((d) => ({ value: d.id, label: d.name }))}
+                      placeholder={t("Select diocese")}
+                      searchPlaceholder={t("Search dioceses...")}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label>{t("Diocese")}</Label>
-                  <SearchableSelect
-                    value={formState.dioceseId}
-                    onChange={(v) => setFormState({ ...formState, dioceseId: v })}
-                    options={dioceses.map((d) => ({ value: d.id, label: d.name }))}
-                    placeholder={t("Select diocese")}
-                    searchPlaceholder={t("Search dioceses...")}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
                     <Label>{t("Clerical Rank")}</Label>
                     <Select
                       value={formState.clericalRank}
                       onValueChange={(v) => setFormState({ ...formState, clericalRank: v })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -2576,13 +2581,13 @@ const loadData = useCallback(async (search?: string) => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label>{t("Monasticism Type")}</Label>
                     <Select
                       value={formState.monasticismType}
                       onValueChange={(v) => setFormState({ ...formState, monasticismType: v })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

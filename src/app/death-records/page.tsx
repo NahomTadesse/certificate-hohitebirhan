@@ -12,6 +12,7 @@ import {
   XCircle,
   ShieldOff,
   ShieldCheck,
+  Eye,
   ScrollText,
 } from "lucide-react";
 
@@ -51,6 +52,7 @@ import { fetchChildrenForDropdown } from "@/services/childrenService";
 import { fetchFathersForDropdown } from "@/services/fatherService";
 import SearchableSelect from "@/components/SearchableSelect";
 import { useTranslation } from "react-i18next";
+import { CertificateViewDialog } from "@/components/CertificateView";
 
 const MEMBER_TYPES: MemberType[] = ["CHILD", "FAMILY_HEAD", "CLERGY"];
 
@@ -64,6 +66,7 @@ export default function DeathRecordsManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isRevokeDialogOpen, setIsRevokeDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<DeathRecord | null>(null);
+  const [viewRecord, setViewRecord] = useState<any | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [revokeReason, setRevokeReason] = useState("");
 
@@ -209,6 +212,9 @@ export default function DeathRecordsManagement() {
       id: "actions",
       cell: ({ row }) => (
         <div className="flex gap-2">
+          <Button size="sm" variant="ghost" title={t("Show Certificate")} onClick={() => setViewRecord(row.original)}>
+            <Eye className="h-4 w-4" />
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -458,6 +464,10 @@ export default function DeathRecordsManagement() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {viewRecord && (
+          <CertificateViewDialog open onClose={() => setViewRecord(null)} type="DEATH" data={viewRecord} />
+        )}
 
         {/* Revoke Dialog */}
         <Dialog open={isRevokeDialogOpen} onOpenChange={setIsRevokeDialogOpen}>

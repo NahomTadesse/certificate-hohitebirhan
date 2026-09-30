@@ -9,6 +9,7 @@ import {
   RefreshCw,
   ShieldOff,
   ShieldCheck,
+  Eye,
   ScrollText,
 } from "lucide-react";
 
@@ -46,6 +47,7 @@ import { fetchChurchesForDropdown } from "@/services/churchService";
 import { fetchFathersForDropdown } from "@/services/fatherService";
 import SearchableSelect from "@/components/SearchableSelect";
 import { useTranslation } from "react-i18next";
+import { CertificateViewDialog } from "@/components/CertificateView";
 
 // Unified brand color for certificates - a deep blue-green (teal) mix
 const CERT_COLOR = "#0d5c63";
@@ -89,6 +91,7 @@ export default function BaptismCertificatesManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isRevokeDialogOpen, setIsRevokeDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<BaptismRecord | null>(null);
+  const [viewRecord, setViewRecord] = useState<any | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [revokeReason, setRevokeReason] = useState("");
 
@@ -211,6 +214,9 @@ export default function BaptismCertificatesManagement() {
       id: "actions",
       cell: ({ row }) => (
         <div className="flex gap-2">
+          <Button size="sm" variant="ghost" title={t("Show Certificate")} onClick={() => setViewRecord(row.original)}>
+            <Eye className="h-4 w-4" />
+          </Button>
           <Button size="sm" variant="ghost" title={t("Verify")} onClick={() => handleVerify(row.original)}>
             <ShieldCheck className="h-4 w-4" />
           </Button>
@@ -488,6 +494,15 @@ export default function BaptismCertificatesManagement() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {viewRecord && (
+          <CertificateViewDialog
+            open
+            onClose={() => setViewRecord(null)}
+            type="BAPTISM"
+            data={viewRecord}
+          />
+        )}
 
         {/* Revoke Dialog */}
         <Dialog  open={isRevokeDialogOpen} onOpenChange={setIsRevokeDialogOpen}>

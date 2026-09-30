@@ -944,5 +944,7 @@
   "This photo is used for this ID only; the member's profile photo is not changed.": "ይህ ፎቶ ለዚህ መታወቂያ ብቻ ነው፤ የአባሉ የመገለጫ ፎቶ አይለወጥም።",
   "Using the member's profile photo.": "የአባሉ የመገለጫ ፎቶ ጥቅም ላይ ይውላል።",
   "No profile photo on file - upload one for the ID.": "የመገለጫ ፎቶ የለም - ለመታወቂያው ፎቶ ይጫኑ።",
-  "This photo will appear on the certificate": "ይህ ፎቶ በምስክር ወረቀቱ ላይ ይታያል"
+  "This photo will appear on the certificate": "ይህ ፎቶ በምስክር ወረቀቱ ላይ ይታያል",
+  "Show Certificate": "የምስክር ወረቀት አሳይ",
+  "Show": "አሳይ"
 }

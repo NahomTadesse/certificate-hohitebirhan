@@ -944,5 +944,7 @@
   "This photo is used for this ID only; the member's profile photo is not changed.": "This photo is used for this ID only; the member's profile photo is not changed.",
   "Using the member's profile photo.": "Using the member's profile photo.",
   "No profile photo on file - upload one for the ID.": "No profile photo on file - upload one for the ID.",
-  "This photo will appear on the certificate": "This photo will appear on the certificate"
+  "This photo will appear on the certificate": "This photo will appear on the certificate",
+  "Show Certificate": "Show Certificate",
+  "Show": "Show"
 }

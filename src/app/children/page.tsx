@@ -104,6 +104,7 @@ import {
 import { fetchFathersForDropdown, FatherDropdownOption } from "@/services/fatherService";
 import { fetchFatherTransfersByChild } from "@/services/fatherTransferService";
 import {
+  fetchNamePrefixes,
   fetchNamePrefixesForGender,
   prefixDisplay,
   NamePrefix,
@@ -136,7 +137,7 @@ export default function ChildrenManagement() {
   const [idCardPhoto, setIdCardPhoto] = useState<string | null>(null);
   const idCardRef = useRef<HTMLDivElement>(null);
   const { t, i18n } = useTranslation();
-  const [prefixOptions, setPrefixOptions] = useState<NamePrefix[]>([]);
+  const [allPrefixes, setAllPrefixes] = useState<NamePrefix[]>([]);
 
   // name shown with its honorific, e.g. "Ato Abebe Kebede"
   const withPrefix = (c?: Partial<Child> | null) => {
@@ -292,24 +293,43 @@ export default function ChildrenManagement() {
     loadData();
   }, [loadData]);
 
-  // Prefix choices come from the API and depend on the selected gender
+  // Load every active prefix once (same source the father form uses). If the full list
+  // endpoint returns nothing, fall back to the per-gender endpoints.
   useEffect(() => {
-    if (!formState.gender) {
-      setPrefixOptions([]);
-      return;
-    }
     let cancelled = false;
-    fetchNamePrefixesForGender(formState.gender)
-      .then((list) => {
-        if (!cancelled) setPrefixOptions(list.filter((p) => p.active !== false));
-      })
-      .catch(() => {
-        if (!cancelled) setPrefixOptions([]);
-      });
+    (async () => {
+      let list: NamePrefix[] = [];
+      try {
+        list = await fetchNamePrefixes();
+      } catch {
+        list = [];
+      }
+      if (list.length === 0) {
+        try {
+          const [m, f] = await Promise.all([
+            fetchNamePrefixesForGender("MALE"),
+            fetchNamePrefixesForGender("FEMALE"),
+          ]);
+          const seen = new Set<string>();
+          list = [...m, ...f].filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
+        } catch {
+          list = [];
+        }
+      }
+      if (!cancelled) setAllPrefixes(list.filter((p) => p.active !== false));
+    })();
     return () => {
       cancelled = true;
     };
-  }, [formState.gender]);
+  }, []);
+
+  // Dropdown options: everything until a gender is chosen, then only the prefixes that
+  // apply to that gender (prefixes with no gender / BOTH apply to everyone).
+  const prefixOptions = allPrefixes.filter((p) => {
+    if (!formState.gender) return true;
+    const a = String(p.appliesTo || "").toUpperCase();
+    return !a || a === "BOTH" || a === "ALL" || a === formState.gender;
+  });
 
   // Debounce the search box, then ask the backend to filter the list
   // (a local filter below still applies as a fallback in case the API
@@ -901,7 +921,7 @@ export default function ChildrenManagement() {
 
         {/* Add Child Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl">{t("Register New Child")}</DialogTitle>
             </DialogHeader>
@@ -929,38 +949,64 @@ export default function ChildrenManagement() {
                     />
                   </div>
                 </div>
-                <div>
-                  <Label>{t("Gender")} *</Label>
-                  <Select
-                    value={formState.gender}
-                    onValueChange={(v) => {
-                      // prefixes are gender specific, so clear the chosen one
-                      setFormState({ ...formState, gender: v, namePrefixId: "" });
-                      if (formErrors.gender) setFormErrors({ ...formErrors, gender: "" });
-                    }}
-                  >
-                    <SelectTrigger className={formErrors.gender ? "border-destructive focus-visible:ring-destructive" : ""}>
-                      <SelectValue placeholder={t("Select gender")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="MALE">{t("Male")}</SelectItem>
-                      <SelectItem value="FEMALE">{t("Female")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {formErrors.gender && (
-                    <p className="text-xs text-destructive mt-1">{formErrors.gender}</p>
-                  )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>{t("Gender")} *</Label>
+                    <Select
+                      value={formState.gender}
+                      onValueChange={(v) => {
+                        // keep the chosen prefix only if it still applies to the new gender
+                        const cur = allPrefixes.find((p) => p.id === formState.namePrefixId);
+                        const a = String(cur?.appliesTo || "").toUpperCase();
+                        const keep = !cur || !a || a === "BOTH" || a === "ALL" || a === v;
+                        setFormState({ ...formState, gender: v, namePrefixId: keep ? formState.namePrefixId : "" });
+                        if (formErrors.gender) setFormErrors({ ...formErrors, gender: "" });
+                      }}
+                    >
+                      <SelectTrigger className={`w-full ${formErrors.gender ? "border-destructive focus-visible:ring-destructive" : ""}`}>
+                        <SelectValue placeholder={t("Select gender")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MALE">{t("Male")}</SelectItem>
+                        <SelectItem value="FEMALE">{t("Female")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {formErrors.gender && <p className="text-xs text-destructive">{formErrors.gender}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{t("Date of Birth")} *</Label>
+                    <Input
+                      type="date"
+                      value={formState.dateOfBirth}
+                      onChange={(e) => {
+                        setFormState({ ...formState, dateOfBirth: e.target.value });
+                        if (formErrors.dateOfBirth) setFormErrors({ ...formErrors, dateOfBirth: "" });
+                      }}
+                      aria-invalid={!!formErrors.dateOfBirth}
+                      className={`w-full ${formErrors.dateOfBirth ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                    />
+                    {formErrors.dateOfBirth && <p className="text-xs text-destructive">{formErrors.dateOfBirth}</p>}
+                  </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
                     <Label>{t("Prefix")}</Label>
                     <Select
                       value={formState.namePrefixId || "none"}
-                      onValueChange={(v) => setFormState({ ...formState, namePrefixId: v === "none" ? "" : v })}
-                      disabled={!formState.gender}
+                      onValueChange={(v) => {
+                        const picked = allPrefixes.find((p) => p.id === v);
+                        const a = String(picked?.appliesTo || "").toUpperCase();
+                        setFormState({
+                          ...formState,
+                          namePrefixId: v === "none" ? "" : v,
+                          // picking a gendered prefix fills in the gender if it is still empty
+                          gender: !formState.gender && (a === "MALE" || a === "FEMALE") ? a : formState.gender,
+                        });
+                      }}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder={formState.gender ? t("None") : t("Select gender first")} />
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={t("None")} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">{t("None")}</SelectItem>
@@ -972,7 +1018,7 @@ export default function ChildrenManagement() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="col-span-2">
+                  <div className="space-y-1.5">
                     <Label>{t("First Name")} *</Label>
                     <Input
                       value={formState.firstName}
@@ -984,11 +1030,9 @@ export default function ChildrenManagement() {
                       aria-invalid={!!formErrors.firstName}
                       className={formErrors.firstName ? "border-destructive focus-visible:ring-destructive" : ""}
                     />
-                    {formErrors.firstName && (
-                      <p className="text-xs text-destructive mt-1">{formErrors.firstName}</p>
-                    )}
+                    {formErrors.firstName && <p className="text-xs text-destructive">{formErrors.firstName}</p>}
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label>{t("Middle Name")}</Label>
                     <Input
                       value={formState.middleName}
@@ -997,24 +1041,23 @@ export default function ChildrenManagement() {
                     />
                   </div>
                 </div>
-                <div>
-                  <Label>{t("Last Name")} *</Label>
-                  <Input
-                    value={formState.lastName}
-                    onChange={(e) => {
-                      setFormState({ ...formState, lastName: e.target.value });
-                      if (formErrors.lastName) setFormErrors({ ...formErrors, lastName: "" });
-                    }}
-                    placeholder="Last name"
-                    aria-invalid={!!formErrors.lastName}
-                    className={formErrors.lastName ? "border-destructive focus-visible:ring-destructive" : ""}
-                  />
-                  {formErrors.lastName && (
-                    <p className="text-xs text-destructive mt-1">{formErrors.lastName}</p>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>{t("Last Name")} *</Label>
+                    <Input
+                      value={formState.lastName}
+                      onChange={(e) => {
+                        setFormState({ ...formState, lastName: e.target.value });
+                        if (formErrors.lastName) setFormErrors({ ...formErrors, lastName: "" });
+                      }}
+                      placeholder="Last name"
+                      aria-invalid={!!formErrors.lastName}
+                      className={formErrors.lastName ? "border-destructive focus-visible:ring-destructive" : ""}
+                    />
+                    {formErrors.lastName && <p className="text-xs text-destructive">{formErrors.lastName}</p>}
+                  </div>
+                  <div className="space-y-1.5">
                     <Label>{t("Christian Name")}</Label>
                     <Input
                       value={formState.christianName}
@@ -1022,7 +1065,7 @@ export default function ChildrenManagement() {
                       placeholder={t("Christian name")}
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label>{t("Mother's Name")}</Label>
                     <Input
                       value={formState.motherName}
@@ -1031,45 +1074,32 @@ export default function ChildrenManagement() {
                     />
                   </div>
                 </div>
-                <div>
-                  <Label>{t("Date of Birth")} *</Label>
-                  <Input
-                    type="date"
-                    value={formState.dateOfBirth}
-                    onChange={(e) => {
-                      setFormState({ ...formState, dateOfBirth: e.target.value });
-                      if (formErrors.dateOfBirth) setFormErrors({ ...formErrors, dateOfBirth: "" });
-                    }}
-                    aria-invalid={!!formErrors.dateOfBirth}
-                    className={formErrors.dateOfBirth ? "border-destructive focus-visible:ring-destructive" : ""}
-                  />
-                  {formErrors.dateOfBirth && (
-                    <p className="text-xs text-destructive mt-1">{formErrors.dateOfBirth}</p>
-                  )}
-                </div>
               </TabsContent>
 
               <TabsContent value="family" className="space-y-4 py-4">
-                <div>
-                  <Label>{t("Email")}</Label>
-                  <Input
-                    type="email"
-                    value={formState.email}
-                    onChange={(e) => {
-                      setFormState({ ...formState, email: e.target.value });
-                      if (formErrors.email) setFormErrors({ ...formErrors, email: "" });
-                    }}
-                    placeholder={t("Email (optional)")}
-                    aria-invalid={!!formErrors.email}
-                    className={formErrors.email ? "border-destructive focus-visible:ring-destructive" : ""}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>{t("Email")}</Label>
+                    <Input
+                      type="email"
+                      value={formState.email}
+                      onChange={(e) => {
+                        setFormState({ ...formState, email: e.target.value });
+                        if (formErrors.email) setFormErrors({ ...formErrors, email: "" });
+                      }}
+                      placeholder={t("Email (optional)")}
+                      aria-invalid={!!formErrors.email}
+                      className={formErrors.email ? "border-destructive focus-visible:ring-destructive" : ""}
+                    />
+                    {formErrors.email && <p className="text-xs text-destructive">{formErrors.email}</p>}
+                  </div>
+                  <PhoneInput
+                    className="space-y-1.5 [&>label]:mb-0"
+                    label={t("Phone Number")}
+                    value={formState.phoneNumber}
+                    onChange={(v) => setFormState({ ...formState, phoneNumber: v })}
                   />
-                  {formErrors.email && <p className="text-xs text-destructive mt-1">{formErrors.email}</p>}
                 </div>
-                <PhoneInput
-                  label={t("Phone Number")}
-                  value={formState.phoneNumber}
-                  onChange={(v) => setFormState({ ...formState, phoneNumber: v })}
-                />
                 <div>
                   <Label>{t("Father")} *</Label>
                   <SearchableSelect
