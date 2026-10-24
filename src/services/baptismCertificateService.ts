@@ -125,3 +125,6 @@ export const revokeBaptismCertificate = async (
     body: JSON.stringify(payload),
   });
 };
+
+// Swagger schema name aliases
+export type BaptismCertificateRequestDTO = BaptismCertificatePayload;

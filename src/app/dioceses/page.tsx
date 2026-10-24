@@ -37,6 +37,7 @@ import {
   createDiocese,
   updateDiocese,
   deactivateDiocese,
+  activateDiocese,
   Diocese,
 } from "@/services/dioceseService";
 import { useTranslation } from "react-i18next";
@@ -165,17 +166,28 @@ export default function DioceseManagement() {
           <Button size="sm" variant="ghost" onClick={() => handleEdit(row.original)}>
             <Edit className="h-4 w-4" />
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            onClick={() => {
-              setSelectedDiocese(row.original);
-              setIsDeleteDialogOpen(true);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {row.original.active === false ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+              onClick={() => handleActivate(row.original)}
+            >
+              {t("Activate")}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={() => {
+                setSelectedDiocese(row.original);
+                setIsDeleteDialogOpen(true);
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -221,6 +233,16 @@ export default function DioceseManagement() {
       toast.error(err.message || "Operation failed");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleActivate = async (diocese: Diocese) => {
+    try {
+      await activateDiocese(diocese.id);
+      toast.success(t("Diocese activated successfully!"));
+      await loadDioceses();
+    } catch (err: any) {
+      toast.error(err.message || t("Activation failed"));
     }
   };
 

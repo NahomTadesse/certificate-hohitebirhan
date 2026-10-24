@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useRef, useState } from "react";
 import { Award, Printer } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { useTranslation } from "react-i18next";
+import { fetchChildById } from "@/services/childrenService";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -24,8 +25,28 @@ export const CERT_TITLES: Record<CertKind, string> = {
   DEATH: "Death Certificate",
 };
 
-const fmtDate = (d?: string) =>
-  d ? new Date(d).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "";
+// ---- Dates: Gregorian (English) and Ethiopian calendar (Amharic) ----
+const fmtDateEn = (d?: string) => {
+  if (!d) return "";
+  try {
+    return new Date(d).toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
+  } catch {
+    return d;
+  }
+};
+const fmtDateAm = (d?: string) => {
+  if (!d) return "";
+  try {
+    return new Date(d).toLocaleDateString("am-ET-u-ca-ethiopic", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+  } catch {
+    return "";
+  }
+};
 
 // Passport-style photo box. Falls back to a labelled empty frame.
 function CertPhoto({ src, label }: { src?: string | null; label: string }) {
@@ -46,138 +67,265 @@ function CertPhoto({ src, label }: { src?: string | null; label: string }) {
   );
 }
 
-const getFields = (type: CertKind, d: any): { am: string; en: string; value: string }[] => {
+interface CertField {
+  key: string;
+  am: string; // Amharic label
+  en: string; // English label
+  value?: string; // value as stored (the language it was entered in)
+  valueEn?: string; // English spelling, when known
+  date?: string; // raw ISO date - rendered in both calendars
+}
+
+const getFields = (type: CertKind, d: any, en: Record<string, string>): CertField[] => {
+  const f = (key: string, am: string, enLabel: string, value?: string): CertField => ({
+    key,
+    am,
+    en: enLabel,
+    value: value || "",
+    valueEn: en[key] || "",
+  });
+  const dt = (key: string, am: string, enLabel: string, value?: string): CertField => ({
+    key,
+    am,
+    en: enLabel,
+    date: value || "",
+  });
   if (type === "BAPTISM") {
     return [
-      { am: "የቤተሰብ ስም", en: "Family Name", value: d.familyName },
-      { am: "የግል ስም", en: "Proper Name", value: d.properName },
-      { am: "የተጠመቀው(ችው) ክርስትና ስም", en: "Christian Name", value: d.christianName },
-      { am: "የአባት ስም", en: "Father's Name", value: d.fatherName },
-      { am: "የእናት ስም", en: "Mother's Name", value: d.motherName },
-      { am: "የክርስትና አባት (እናት) ስም", en: "God Father's or Mothers' Name", value: d.godParentName },
-      { am: "ሀገር", en: "Country", value: d.country },
-      { am: "የተወለደበት(ችበት) ቦታ", en: "Place of Birth", value: d.placeOfBirth },
-      { am: "የትውልድ ሀገር", en: "Nationality", value: d.nationality },
-      { am: "የተወለደበት(ችበት) ቀን", en: "Date of Birth", value: fmtDate(d.dateOfBirth) },
-      { am: "የተጠመቀበት(ችበት) ቀን", en: "Date of Baptism", value: fmtDate(d.dateOfBaptism) },
-      { am: "የተጠመቀበት(ችበት) ቤተ ክርስቲያን", en: "Church", value: d.church },
-      { am: "ዜግነት", en: "Citizenship", value: d.citizenship },
-      { am: "አጥማቂው ካህን", en: "Baptizing Priest", value: d.baptizingPriestName },
-    ].map((f) => ({ ...f, value: f.value || "" }));
+      f("familyName", "የቤተሰብ ስም", "Family Name", d.familyName),
+      f("properName", "የግል ስም", "Proper Name", d.properName),
+      f("christianName", "የተጠመቀው(ችው) ክርስትና ስም", "Christian Name", d.christianName),
+      f("fatherName", "የአባት ስም", "Father's Name", d.fatherName),
+      f("motherName", "የእናት ስም", "Mother's Name", d.motherName),
+      f("godParentName", "የክርስትና አባት (እናት) ስም", "God Father's or Mothers' Name", d.godParentName),
+      f("country", "ሀገር", "Country", d.country),
+      f("placeOfBirth", "የተወለደበት(ችበት) ቦታ", "Place of Birth", d.placeOfBirth),
+      f("nationality", "የትውልድ ሀገር", "Nationality", d.nationality),
+      dt("dateOfBirth", "የተወለደበት(ችበት) ቀን", "Date of Birth", d.dateOfBirth),
+      dt("dateOfBaptism", "የተጠመቀበት(ችበት) ቀን", "Date of Baptism", d.dateOfBaptism),
+      f("church", "የተጠመቀበት(ችበት) ቤተ ክርስቲያን", "Church", d.church),
+      f("citizenship", "ዜግነት", "Citizenship", d.citizenship),
+      f("baptizingPriestName", "አጥማቂው ካህን", "Baptizing Priest", d.baptizingPriestName),
+    ];
   }
   if (type === "WEDDING") {
     return [
-      { am: "የሙሽራው ስም", en: "Groom's Name", value: d.groomFullName },
-      { am: "የሙሽራው ዜግነት", en: "Groom's Nationality", value: d.groomNationality },
-      { am: "የሙሽሪት ስም", en: "Bride's Name", value: d.brideFullName },
-      { am: "የሙሽሪት ዜግነት", en: "Bride's Nationality", value: d.brideNationality },
-      { am: "ሀገር", en: "Country", value: d.country },
-      { am: "የተጋቡበት ቤተ ክርስቲያን", en: "Church", value: d.church },
-      { am: "የተጋቡበት ቀን", en: "Date of Marriage", value: fmtDate(d.dateOfMarriage) },
-      { am: "አጋቢው ካህን", en: "Officiating Priest", value: d.officiatingPriestName },
-      { am: "ምስክር 1", en: "Witness 1", value: d.witness1Name },
-      { am: "ምስክር 2", en: "Witness 2", value: d.witness2Name },
-      { am: "ምስክር 3", en: "Witness 3", value: d.witness3Name },
-    ].map((f) => ({ ...f, value: f.value || "" }));
+      f("groomFullName", "የሙሽራው ስም", "Groom's Name", d.groomFullName),
+      f("groomNationality", "የሙሽራው ዜግነት", "Groom's Nationality", d.groomNationality),
+      f("brideFullName", "የሙሽሪት ስም", "Bride's Name", d.brideFullName),
+      f("brideNationality", "የሙሽሪት ዜግነት", "Bride's Nationality", d.brideNationality),
+      f("country", "ሀገር", "Country", d.country),
+      f("church", "የተጋቡበት ቤተ ክርስቲያን", "Church", d.church),
+      dt("dateOfMarriage", "የተጋቡበት ቀን", "Date of Marriage", d.dateOfMarriage),
+      f("officiatingPriestName", "አጋቢው ካህን", "Officiating Priest", d.officiatingPriestName),
+      f("witness1Name", "ምስክር 1", "Witness 1", d.witness1Name),
+      f("witness2Name", "ምስክር 2", "Witness 2", d.witness2Name),
+      f("witness3Name", "ምስክር 3", "Witness 3", d.witness3Name),
+    ];
   }
   return [
-    { am: "ሙሉ ስም", en: "Full Name", value: d.fullName || d.memberName },
-    { am: "የሰበካ አባል መለያ", en: "Sebeka Member ID", value: d.sebekaMemberId },
-    { am: "የአባልነት ዓይነት", en: "Member Type", value: d.memberType },
-    { am: "የስራ መደብ", en: "Occupation", value: d.occupation },
-    { am: "ማዕረግ", en: "Rank / Title", value: d.rankOrTitle },
-    { am: "የሞተበት ቀን", en: "Date of Death", value: fmtDate(d.dateOfDeath) },
-    { am: "የተቀበረበት ቦታ", en: "Burial Place", value: d.burialPlace },
-    { am: "አስፈጻሚ", en: "Officiant", value: d.officiant },
-    { am: "ማስታወሻ", en: "Remarks", value: d.remarks },
-  ].map((f) => ({ ...f, value: f.value || "" }));
+    f("fullName", "ሙሉ ስም", "Full Name", d.fullName || d.memberName),
+    f("sebekaMemberId", "የሰበካ አባል መለያ", "Sebeka Member ID", d.sebekaMemberId),
+    f("memberType", "የአባልነት ዓይነት", "Member Type", d.memberType),
+    f("occupation", "የስራ መደብ", "Occupation", d.occupation),
+    f("rankOrTitle", "ማዕረግ", "Rank / Title", d.rankOrTitle),
+    dt("dateOfDeath", "የሞተበት ቀን", "Date of Death", d.dateOfDeath),
+    f("burialPlace", "የተቀበረበት ቦታ", "Burial Place", d.burialPlace),
+    f("officiant", "አስፈጻሚ", "Officiant", d.officiant),
+    f("remarks", "ማስታወሻ", "Remarks", d.remarks),
+  ];
 };
 
-const getSubject = (type: CertKind, d: any) => {
-  if (type === "BAPTISM") return `${d.properName || ""} ${d.familyName || ""}`.trim();
-  if (type === "WEDDING") return `${d.groomFullName || ""} & ${d.brideFullName || ""}`.trim();
-  return d.fullName || d.memberName || "";
+const getSubject = (type: CertKind, d: any, en: Record<string, string>) => {
+  const am =
+    type === "BAPTISM"
+      ? `${d.properName || ""} ${d.familyName || ""}`.trim()
+      : type === "WEDDING"
+      ? `${d.groomFullName || ""} & ${d.brideFullName || ""}`.trim()
+      : d.fullName || d.memberName || "";
+  const eng =
+    type === "BAPTISM"
+      ? `${en.properName || ""} ${en.familyName || ""}`.trim()
+      : type === "WEDDING"
+      ? en.groomFullName && en.brideFullName
+        ? `${en.groomFullName} & ${en.brideFullName}`
+        : ""
+      : en.fullName || "";
+  return { am, en: eng };
 };
 
 const getEventDate = (type: CertKind, d: any) =>
-  type === "BAPTISM" ? fmtDate(d.dateOfBaptism) : type === "WEDDING" ? fmtDate(d.dateOfMarriage) : fmtDate(d.dateOfDeath);
+  type === "BAPTISM" ? d.dateOfBaptism : type === "WEDDING" ? d.dateOfMarriage : d.dateOfDeath;
 
-const getSentence = (type: CertKind) =>
-  type === "BAPTISM"
-    ? "is baptized according to the Law and Order of Ethiopian Orthodox Tewahido Church at the above mentioned place and date."
-    : type === "WEDDING"
-    ? "were married according to the Law and Order of Ethiopian Orthodox Tewahido Church at the above mentioned church and date."
-    : "departed this life, as recorded according to the records of Ethiopian Orthodox Tewahido Church.";
+const SENTENCE: Record<CertKind, { am: string; en: string }> = {
+  BAPTISM: {
+    am: "በኢትዮጵያ ኦርቶዶክስ ተዋሕዶ ቤተ ክርስቲያን ሥርዓትና ሕግ መሠረት ከላይ በተገለጸው ቦታና ቀን መጠመቁን(ቋን) እናረጋግጣለን።",
+    en: "is baptized according to the Law and Order of Ethiopian Orthodox Tewahido Church at the above mentioned place and date.",
+  },
+  WEDDING: {
+    am: "በኢትዮጵያ ኦርቶዶክስ ተዋሕዶ ቤተ ክርስቲያን ሥርዓትና ሕግ መሠረት ከላይ በተገለጸው ቤተ ክርስቲያንና ቀን መጋባታቸውን እናረጋግጣለን።",
+    en: "were married according to the Law and Order of Ethiopian Orthodox Tewahido Church at the above mentioned church and date.",
+  },
+  DEATH: {
+    am: "በኢትዮጵያ ኦርቶዶክስ ተዋሕዶ ቤተ ክርስቲያን መዝገብ መሠረት ማረፉን(ፏን) እናረጋግጣለን።",
+    en: "departed this life, as recorded according to the records of Ethiopian Orthodox Tewahido Church.",
+  },
+};
+
+const CERT_TITLES_AM: Record<CertKind, string> = {
+  BAPTISM: "የጥምቀት የምስክር ወረቀት",
+  WEDDING: "የጋብቻ የምስክር ወረቀት",
+  DEATH: "የሞት የምስክር ወረቀት",
+};
+
+const enName = (c: any) =>
+  [c?.firstNameEn, c?.middleNameEn, c?.lastNameEn].filter(Boolean).join(" ");
 
 interface CertificatePaperProps {
   type: CertKind;
   data: any;
   photos?: CertPhotos;
+  // optional explicit child ids (otherwise taken from the record: childId / groomChildId / brideChildId / memberId)
+  childIds?: { main?: string; groom?: string; bride?: string };
 }
 
-// The printable certificate itself. Forward the ref so react-to-print can target it.
+// The printable certificate itself - always bilingual (Amharic + English).
+// English spellings of the names come from the child records (firstNameEn / middleNameEn / lastNameEn).
+// Forward the ref so react-to-print can target it.
 export const CertificatePaper = forwardRef<HTMLDivElement, CertificatePaperProps>(
-  ({ type, data, photos }, ref) => {
-    const { t, i18n } = useTranslation();
-    const certLang = i18n.language === "am" ? "am" : "en";
+  ({ type, data, photos, childIds }, ref) => {
+    const { t } = useTranslation();
     const d = data || {};
+    const [en, setEn] = useState<Record<string, string>>({});
+
+    const mainId = childIds?.main || d.childId || (type === "DEATH" && (!d.memberType || d.memberType === "CHILD") ? d.memberId : undefined);
+    const groomId = childIds?.groom || d.groomChildId;
+    const brideId = childIds?.bride || d.brideChildId;
+
+    useEffect(() => {
+      let cancelled = false;
+      (async () => {
+        const out: Record<string, string> = {};
+        try {
+          if (type === "WEDDING") {
+            const [g, b] = await Promise.all([
+              groomId ? fetchChildById(groomId).catch(() => null) : null,
+              brideId ? fetchChildById(brideId).catch(() => null) : null,
+            ]);
+            if (g && enName(g)) out.groomFullName = enName(g);
+            if (b && enName(b)) out.brideFullName = enName(b);
+          } else if (mainId) {
+            const c: any = await fetchChildById(mainId).catch(() => null);
+            if (c && enName(c)) {
+              if (type === "BAPTISM") {
+                if (c.firstNameEn) out.properName = c.firstNameEn;
+                if (c.lastNameEn) out.familyName = c.lastNameEn;
+              } else {
+                out.fullName = enName(c);
+              }
+            }
+          }
+        } catch {
+          /* English spelling is optional */
+        }
+        if (!cancelled) setEn(out);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [type, mainId, groomId, brideId]);
+
+    const subject = getSubject(type, d, en);
+    const eventDate = getEventDate(type, d);
 
     return (
       <div ref={ref} className="relative border-4 p-3 bg-[#fbfcfd] text-slate-900" style={{ borderColor: CERT_COLOR }}>
         <div className="border-2 p-6" style={{ borderColor: CERT_COLOR }}>
           <div className="flex items-start justify-between gap-4">
             {type === "WEDDING" ? (
-              <CertPhoto src={photos?.groom} label={t("Groom")} />
+              <CertPhoto src={photos?.groom} label={`${t("Groom")} / Groom`} />
             ) : (
               <div className="flex flex-col items-center w-20 pt-1">
                 <Award className="h-10 w-10" style={{ color: CERT_COLOR }} />
               </div>
             )}
-            <div className="flex-1 text-center">
+            <div className="flex-1 text-center space-y-0.5">
               <p className="text-sm font-bold" style={{ color: CERT_COLOR }}>
-                {certLang === "am" ? "የኢትዮጵያ ኦርቶዶክስ ተዋሕዶ ቤተ ክርስቲያን" : "ETHIOPIAN ORTHODOX TEWAHIDO CHURCH"}
+                የኢትዮጵያ ኦርቶዶክስ ተዋሕዶ ቤተ ክርስቲያን
               </p>
-              <p className="text-base font-bold uppercase" style={{ color: CERT_COLOR }}>
-                {t(CERT_TITLES[type])}
+              <p className="text-xs font-bold tracking-wide" style={{ color: CERT_COLOR }}>
+                ETHIOPIAN ORTHODOX TEWAHIDO CHURCH
+              </p>
+              <p className="text-base font-bold pt-1" style={{ color: CERT_COLOR }}>
+                {CERT_TITLES_AM[type]}
+              </p>
+              <p className="text-sm font-bold uppercase" style={{ color: CERT_COLOR }}>
+                {CERT_TITLES[type]}
               </p>
             </div>
             {type === "WEDDING" ? (
-              <CertPhoto src={photos?.bride} label={t("Bride")} />
+              <CertPhoto src={photos?.bride} label={`${t("Bride")} / Bride`} />
             ) : (
-              <CertPhoto src={photos?.main} label={t("Photo")} />
+              <CertPhoto src={photos?.main} label="ፎቶ / Photo" />
             )}
           </div>
 
           <div className="text-right text-xs mt-2" style={{ color: CERT_COLOR }}>
-            {t("Registration No.")} <span className="font-mono">{d.registrationNo || ""}</span>
+            የምዝገባ ቁጥር / Registration No. <span className="font-mono">{d.registrationNo || ""}</span>
           </div>
 
           <div className="mt-4 space-y-2 text-sm">
-            {getFields(type, d).map((f, i) => (
-              <div key={i} className="grid grid-cols-[1.4fr_1.6fr] gap-2 border-b border-dotted pb-1">
-                <span
-                  className={certLang === "am" ? "text-xs" : "text-xs italic"}
-                  style={certLang === "am" ? { color: CERT_COLOR } : undefined}
-                >
-                  {certLang === "am" ? f.am : f.en}
+            {getFields(type, d, en).map((f) => (
+              <div key={f.key} className="grid grid-cols-[1.4fr_1.6fr] gap-2 border-b border-dotted pb-1">
+                <span className="text-xs leading-tight">
+                  <span className="block" style={{ color: CERT_COLOR }}>
+                    {f.am}
+                  </span>
+                  <span className="block italic text-slate-600">{f.en}</span>
                 </span>
-                <span className="text-xs font-medium">{f.value || "……………………………"}</span>
+                <span className="text-xs font-medium leading-tight">
+                  {f.date !== undefined ? (
+                    f.date ? (
+                      <>
+                        <span className="block">{fmtDateAm(f.date) || fmtDateEn(f.date)}</span>
+                        {fmtDateAm(f.date) && <span className="block text-slate-600">{fmtDateEn(f.date)}</span>}
+                      </>
+                    ) : (
+                      "……………………………"
+                    )
+                  ) : f.value || f.valueEn ? (
+                    <>
+                      {f.value && <span className="block">{f.value}</span>}
+                      {f.valueEn && f.valueEn !== f.value && <span className="block text-slate-600">{f.valueEn}</span>}
+                    </>
+                  ) : (
+                    "……………………………"
+                  )}
+                </span>
               </div>
             ))}
           </div>
 
-          <p className="text-xs mt-4 leading-relaxed">
-            {t("This is to certify that")} <strong>{getSubject(type, d)}</strong> {t(getSentence(type))}
-          </p>
+          <div className="text-xs mt-4 leading-relaxed space-y-2">
+            <p>
+              ይህ የምስክር ወረቀት <strong>{subject.am}</strong> {SENTENCE[type].am}
+            </p>
+            <p className="text-slate-700">
+              This is to certify that <strong>{subject.en || subject.am}</strong> {SENTENCE[type].en}
+            </p>
+          </div>
 
           <div className="flex justify-between mt-8 text-xs">
             <div className="text-center">
-              <div className="w-32 border-t border-slate-500 mb-1" />
-              {t("Church's administrator Signature")}
+              <div className="w-36 border-t border-slate-500 mb-1" />
+              <div>የቤተ ክርስቲያኑ አስተዳዳሪ ፊርማ</div>
+              <div className="text-slate-600">Church&apos;s administrator Signature</div>
             </div>
             <div className="text-center">
-              <div className="w-32 border-t border-slate-500 mb-1" />
-              {t("Date")} {getEventDate(type, d)}
+              <div className="w-36 border-t border-slate-500 mb-1" />
+              <div>ቀን / Date</div>
+              <div>{eventDate ? fmtDateAm(eventDate) || fmtDateEn(eventDate) : ""}</div>
+              <div className="text-slate-600">{eventDate ? fmtDateEn(eventDate) : ""}</div>
             </div>
           </div>
         </div>

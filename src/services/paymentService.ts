@@ -1,22 +1,49 @@
 import { authenticatedFetch } from "./api";
 
-export type PaymentType = "MONTHLY" | "PREPAID";
-export type PaymentReportType = "MEMBERSHIP" | "CERTIFICATE";
-export type PaymentStatus = "PAID" | "PARTIAL" | "WAIVED" | "OVERDUE";
+// Swagger: PaymentResponseDTO.type / CreatePaymentRequest.type / fee-controller type
+export type PaymentFeeType =
+  | "MEMBERSHIP"
+  | "CERTIFICATE_BAPTISM"
+  | "CERTIFICATE_BIRTH"
+  | "CERTIFICATE_DEATH"
+  | "CERTIFICATE_WEDDING"
+  | "WEDDING_BOOKING"
+  | "BAPTISM_SERVICE"
+  | "OTHER";
+
+export const PAYMENT_FEE_TYPES: PaymentFeeType[] = [
+  "MEMBERSHIP",
+  "CERTIFICATE_BAPTISM",
+  "CERTIFICATE_BIRTH",
+  "CERTIFICATE_DEATH",
+  "CERTIFICATE_WEDDING",
+  "WEDDING_BOOKING",
+  "BAPTISM_SERVICE",
+  "OTHER",
+];
+
+export type CertificateFeeKind = "BAPTISM" | "BIRTH" | "DEATH" | "WEDDING";
+export const CERTIFICATE_FEE_KINDS: CertificateFeeKind[] = ["BAPTISM", "BIRTH", "DEATH", "WEDDING"];
+
+export type PaymentType = "MONTHLY" | "PREPAID"; // UI-only (legacy form)
+// Report types now follow the full fee-type list from the Swagger.
+export type PaymentReportType = PaymentFeeType;
+export type PaymentStatus = "PAID" | "PARTIAL" | "WAIVED" | "OVERDUE" | "PENDING";
 
 export interface MakePaymentPayload {
   childId: string;
-  rate: number;
+  rate?: number;
   type: PaymentType;
   months: number;
-  paymentReference?: string;
+  promoCode?: string;
 }
 
+// PaymentResponseDTO
 export interface Payment {
   id?: string;
   childId?: string;
   childName?: string;
-  type: PaymentReportType;
+  type: PaymentFeeType | string;
   amount?: number;
   validFrom?: string;
   validTo?: string;
@@ -26,6 +53,23 @@ export interface Payment {
   customReason?: string;
   periodStart?: string;
   periodEnd?: string;
+  receiptNumber?: string;
+  churchId?: string;
+  promoCode?: string;
+  discountAmount?: number;
+}
+
+// CreatePaymentRequest
+export interface CreatePaymentRequest {
+  childId?: string;
+  churchId?: string;
+  type: PaymentFeeType;
+  months?: number;
+  customAmount?: number;
+  customReason?: string;
+  promoCode?: string;
+  waive?: boolean;
+  referenceId?: string;
 }
 
 export interface BaseResponse<T = any> {
@@ -34,51 +78,55 @@ export interface BaseResponse<T = any> {
   data?: T;
 }
 
-// POST: Pay membership fee for a child (supports optional custom rate/reason/reference)
+// POST /api/payments  (generic payment - any fee type)
+export const createPayment = async (payload: CreatePaymentRequest): Promise<BaseResponse> =>
+  authenticatedFetch<BaseResponse>("/api/payments", { method: "POST", body: JSON.stringify(payload) });
+
+// POST /api/payments/quote  (price preview incl. promo code / custom amount, nothing is saved)
+export const quotePayment = async (payload: CreatePaymentRequest): Promise<BaseResponse> =>
+  authenticatedFetch<BaseResponse>("/api/payments/quote", { method: "POST", body: JSON.stringify(payload) });
+
+// POST /api/payments/membership
 export const payMembership = async (
   childId: string,
   months = 1,
   customRate?: number,
   customReason?: string,
-  paymentReference?: string
+  promoCode?: string
 ): Promise<BaseResponse> => {
   const params = new URLSearchParams({ childId, months: String(months) });
-  if (customRate !== undefined) params.set("customRate", String(customRate));
+  if (promoCode) params.set("promoCode", promoCode);
+  if (customRate !== undefined && !Number.isNaN(customRate)) params.set("customRate", String(customRate));
   if (customReason) params.set("customReason", customReason);
-  if (paymentReference) params.set("paymentReference", paymentReference);
-  return await authenticatedFetch<BaseResponse>(`/api/payments/membership?${params.toString()}`, {
-    method: "POST",
-  });
+  return authenticatedFetch<BaseResponse>(`/api/payments/membership?${params.toString()}`, { method: "POST" });
 };
 
-// POST: Pay certificate fee for a child (supports optional custom rate/reason/reference)
+// POST /api/payments/certificate  (certificateType is now required)
 export const payCertificateFee = async (
   childId: string,
+  certificateType: CertificateFeeKind,
   customRate?: number,
   customReason?: string,
-  paymentReference?: string
+  promoCode?: string
 ): Promise<BaseResponse> => {
-  const params = new URLSearchParams({ childId });
-  if (customRate !== undefined) params.set("customRate", String(customRate));
+  const params = new URLSearchParams({ childId, certificateType });
+  if (promoCode) params.set("promoCode", promoCode);
+  if (customRate !== undefined && !Number.isNaN(customRate)) params.set("customRate", String(customRate));
   if (customReason) params.set("customReason", customReason);
-  if (paymentReference) params.set("paymentReference", paymentReference);
-  return await authenticatedFetch<BaseResponse>(`/api/payments/certificate?${params.toString()}`, {
-    method: "POST",
-  });
+  return authenticatedFetch<BaseResponse>(`/api/payments/certificate?${params.toString()}`, { method: "POST" });
 };
 
-// POST: Waive certificate fee for a child
+// POST /api/payments/certificate/waive  (certificateType is now required)
 export const waiveCertificateFee = async (
   childId: string,
+  certificateType: CertificateFeeKind,
   reason: string
 ): Promise<BaseResponse> => {
-  const params = new URLSearchParams({ childId, reason });
-  return await authenticatedFetch<BaseResponse>(`/api/payments/certificate/waive?${params.toString()}`, {
-    method: "POST",
-  });
+  const params = new URLSearchParams({ childId, certificateType, reason });
+  return authenticatedFetch<BaseResponse>(`/api/payments/certificate/waive?${params.toString()}`, { method: "POST" });
 };
 
-// GET: Payments report within a date range
+// GET /api/payments/report
 export const fetchPaymentsReport = async (
   type: PaymentReportType,
   startDate: string,
@@ -86,10 +134,14 @@ export const fetchPaymentsReport = async (
 ): Promise<Payment[]> => {
   const params = new URLSearchParams({ type, startDate, endDate });
   const response = await authenticatedFetch<any>(`/api/payments/report?${params.toString()}`);
-  return Array.isArray(response) ? response : [];
+  return Array.isArray(response) ? response : Array.isArray(response?.data) ? response.data : [];
 };
 
-// GET: Whether a child has an active membership
+// GET /api/payments/receipt/{receiptNumber}
+export const fetchPaymentByReceipt = async (receiptNumber: string): Promise<BaseResponse> =>
+  authenticatedFetch<BaseResponse>(`/api/payments/receipt/${encodeURIComponent(receiptNumber)}`);
+
+// GET /api/payments/membership/status
 export const hasActiveMembership = async (childId: string): Promise<boolean> => {
   const response = await authenticatedFetch<boolean>(
     `/api/payments/membership/status?childId=${encodeURIComponent(childId)}`
@@ -97,37 +149,30 @@ export const hasActiveMembership = async (childId: string): Promise<boolean> => 
   return Boolean(response);
 };
 
-// GET: Payment history for a child
+// GET /api/payments/history/{childId}
 export const fetchPaymentHistory = async (childId: string): Promise<Payment[]> => {
   const response = await authenticatedFetch<any>(`/api/payments/history/${childId}`);
-  return Array.isArray(response) ? response : [];
+  return Array.isArray(response) ? response : Array.isArray(response?.data) ? response.data : [];
 };
 
-// GET: Whether a child has settled their certificate fee
-export const hasSettledCertificateFee = async (childId: string): Promise<boolean> => {
+// GET /api/payments/can-issue  (certificateType is now required)
+export const canIssueCertificate = async (childId: string, certificateType: CertificateFeeKind): Promise<boolean> => {
   const response = await authenticatedFetch<boolean>(
-    `/api/payments/certificate/status?childId=${encodeURIComponent(childId)}`
+    `/api/payments/can-issue?childId=${encodeURIComponent(childId)}&certificateType=${certificateType}`
   );
   return Boolean(response);
 };
 
-// GET: Whether a certificate can be issued for a child
-export const canIssueCertificate = async (childId: string): Promise<boolean> => {
-  const response = await authenticatedFetch<boolean>(
-    `/api/payments/can-issue?childId=${encodeURIComponent(childId)}`
-  );
-  return Boolean(response);
-};
-
-// Backward-compatible wrapper used by the existing Payments page.
-// Maps the legacy (childId, rate, type, months) shape onto the membership endpoint,
-// treating `rate` as a custom rate override for the standard membership fee.
-export const makePayment = async (payload: MakePaymentPayload): Promise<BaseResponse> => {
-  return payMembership(
+// Backward-compatible wrapper used by the Payments page (membership payment).
+export const makePayment = async (payload: MakePaymentPayload): Promise<BaseResponse> =>
+  payMembership(
     payload.childId,
     payload.months,
     payload.rate,
-    payload.type === "PREPAID" ? "Prepaid membership payment" : undefined,
-    payload.paymentReference
+    payload.rate !== undefined ? (payload.type === "PREPAID" ? "Prepaid membership payment" : "Custom membership rate") : undefined,
+    payload.promoCode
   );
-};
+
+// Map a certificate kind used across the app to its fee type
+export const certificateFeeType = (kind: CertificateFeeKind): PaymentFeeType =>
+  (`CERTIFICATE_${kind}` as PaymentFeeType);

@@ -14,6 +14,7 @@ export interface UpdateProfilePayload {
   middleName?: string;
   lastName?: string;
   phoneNumber?: string;
+  language?: string; // UpdateProfileDTO.language
 }
 
 export interface ChangePasswordPayload {
@@ -43,4 +44,17 @@ export const changePassword = async (payload: ChangePasswordPayload): Promise<an
     method: "POST",
     body: JSON.stringify(payload),
   });
+};
+
+// PUT /api/v1/auth/Update/profile  (updates the logged-in user's own profile, incl. language)
+export const updateMyProfile = async (payload: UpdateProfilePayload): Promise<any> => {
+  return await authenticatedFetch<any>("/api/v1/auth/Update/profile", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+};
+
+// GET /api/v1/auth/profile
+export const fetchMyProfile = async (): Promise<any> => {
+  return await authenticatedFetch<any>("/api/v1/auth/profile");
 };

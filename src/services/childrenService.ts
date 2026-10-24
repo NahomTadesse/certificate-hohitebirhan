@@ -7,6 +7,10 @@ export interface Child {
   firstName: string;
   middleName: string;
   lastName: string;
+  // English (Latin) spelling of the name - used on certificates next to the Amharic name
+  firstNameEn?: string;
+  middleNameEn?: string;
+  lastNameEn?: string;
   sebekaMemberId?: string;
   active?: boolean;
   qrCode?: string | null;
@@ -31,21 +35,44 @@ export interface Child {
   updatedAt?: string;
 }
 
+// ChildCreateRequestDTO (swagger). Required by the API: firstName, firstNameEn, lastName, lastNameEn, fatherId.
+export interface FamilyMemberInput {
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  gender?: "MALE" | "FEMALE" | string;
+  relationType?: "HEAD" | "WIFE" | "HUSBAND" | "SON" | "DAUGHTER" | "OTHER";
+  existingChildId?: string;
+}
+
 export interface CreateChildPayload {
   namePrefixId?: string;
   firstName: string;
-  middleName: string;
+  middleName?: string;
   lastName: string;
+  firstNameEn: string;
+  middleNameEn?: string;
+  lastNameEn: string;
   christianName?: string;
   motherName?: string;
-  email?: string;
-  phoneNumber: string;
-  dateOfBirth: string;
-  gender: string;
+  email?: string; // not in the Swagger DTO any more - kept only so old callers compile; stripped before sending
+  phoneNumber?: string;
+  dateOfBirth?: string;
+  gender?: string;
   fatherId: string;
   placeOfBirth?: string;
   nationality?: string;
+  existingFamilyMemberId?: string;
+  registerAsFamilyHead?: boolean;
+  familyMembers?: FamilyMemberInput[];
 }
+
+// Strip fields the Swagger DTO does not define
+const toChildDto = (payload: Partial<CreateChildPayload>) => {
+  const { email, ...dto } = payload as any;
+  return dto;
+};
 
 export interface UpdateFatherPayload {
   newFatherId: string;
@@ -180,7 +207,7 @@ export const fetchChildById = async (id: string): Promise<Child> => {
 // POST: Create new child (multipart: dto + optional profileImage, per swagger)
 export const createChild = async (payload: CreateChildPayload, profileImage?: File | null): Promise<Child> => {
   const formData = new FormData();
-  formData.append("dto", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+  formData.append("dto", new Blob([JSON.stringify(toChildDto(payload))], { type: "application/json" }));
   if (profileImage) formData.append("profileImage", profileImage);
   return await authenticatedFileUpload<Child>("/api/children", formData, "POST");
 };
@@ -206,7 +233,7 @@ export const updateChild = async (
   profileImage?: File | null
 ): Promise<any> => {
   const formData = new FormData();
-  formData.append("dto", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+  formData.append("dto", new Blob([JSON.stringify(toChildDto(payload))], { type: "application/json" }));
   if (profileImage) formData.append("profileImage", profileImage);
   return await authenticatedFileUpload(`/api/children/${id}`, formData, "PUT");
 };
@@ -228,4 +255,11 @@ export const fetchChildrenByFather = async (
     `/api/children/father/${fatherId}?page=${page}&size=${size}`
   );
   return extractChildList(response);
+};
+
+// GET: Look up a child by identifier (Sebeka member id / phone / QR id) - /api/children/lookup
+export const lookupChild = async (identifier: string): Promise<Child | null> => {
+  const response = await authenticatedFetch<any>(`/api/children/lookup?identifier=${encodeURIComponent(identifier)}`);
+  const data = response && response.data !== undefined ? response.data : response;
+  return (data as Child) || null;
 };

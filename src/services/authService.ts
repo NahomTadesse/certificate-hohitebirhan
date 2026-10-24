@@ -255,3 +255,52 @@ export const registerOperator = async (payload: RegisterOperatorPayload): Promis
     };
   }
 };
+
+// ---- Password recovery (swagger: authentication-controller) ----
+export interface SetPasswordPayload {
+  principal: string;
+  temporaryPassword?: string;
+  newPassword?: string;
+  repeatPassword?: string;
+}
+
+export interface AuthMessage {
+  message?: string;
+  code?: number;
+}
+
+const postPublicJson = async (path: string, body?: any, query?: string): Promise<any> => {
+  const url = joinApiUrl(`${path}${query ? `?${query}` : ""}`);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", accept: "*/*" },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const text = await response.text();
+  let data: any = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { message: text };
+  }
+  if (!response.ok) {
+    throw new Error(data?.message || data?.detail || `Request failed (${response.status})`);
+  }
+  return data;
+};
+
+// POST /api/v1/auth/forgot-password?principal=...  (sends a temporary password)
+export const forgotPassword = async (principal: string): Promise<any> =>
+  postPublicJson("api/v1/auth/forgot-password", undefined, `principal=${encodeURIComponent(principal)}`);
+
+// POST /api/v1/auth/verify-temporary-password
+export const verifyTemporaryPassword = async (payload: SetPasswordPayload): Promise<AuthMessage> =>
+  postPublicJson("api/v1/auth/verify-temporary-password", payload);
+
+// POST /api/v1/auth/setnewpassword
+export const setNewPassword = async (payload: SetPasswordPayload): Promise<AuthMessage> =>
+  postPublicJson("api/v1/auth/setnewpassword", payload);
+
+// POST /api/v1/auth/set-password  (first-time password for accounts created with a temporary one)
+export const setPassword = async (payload: SetPasswordPayload): Promise<AuthMessage> =>
+  postPublicJson("api/v1/auth/set-password", payload);

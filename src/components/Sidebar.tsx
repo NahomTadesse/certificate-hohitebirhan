@@ -28,6 +28,12 @@ import {
   Users2,
   ShieldCheck,
   BadgeCheck,
+  CalendarHeart,
+  CalendarClock,
+  MessageSquare,
+  Link2,
+  Coins,
+  Ticket,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -127,6 +133,36 @@ const baseMenu: MenuSection[] = [
           { label: "Prefix Management", path: "name-prefixes", type: "view" },
         ],
       },
+      {
+        label: "Resources",
+        icon: Package,
+        path: "resources",
+        subMenu: [{ label: "Resource Management", path: "resources", type: "view" }],
+      },
+      {
+        label: "Appointments",
+        icon: CalendarClock,
+        path: "appointments",
+        subMenu: [{ label: "Appointment Requests", path: "appointments", type: "view" }],
+      },
+      {
+        label: "Wedding Bookings",
+        icon: CalendarHeart,
+        path: "wedding-bookings",
+        subMenu: [{ label: "Booking Management", path: "wedding-bookings", type: "view" }],
+      },
+      {
+        label: "SMS",
+        icon: MessageSquare,
+        path: "sms",
+        subMenu: [{ label: "Send SMS & Templates", path: "sms", type: "view" }],
+      },
+      {
+        label: "Portal Links",
+        icon: Link2,
+        path: "portal",
+        subMenu: [{ label: "Guardians & Father Accounts", path: "portal", type: "view" }],
+      },
     
 
  
@@ -142,6 +178,8 @@ const baseMenu: MenuSection[] = [
         subMenu: [
           { label: "Record Payment", path: "payments", type: "view" },
           { label: "Payment Reports", path: "payment-reports", type: "view" },
+          { label: "Fees", path: "fees", type: "view" },
+          { label: "Promo Codes", path: "promo-codes", type: "view" },
         ],
       },
       {

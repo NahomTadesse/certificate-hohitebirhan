@@ -159,3 +159,6 @@ export const revokeDeathRecord = async (
     }
   );
 };
+
+// Swagger schema name aliases
+export type DeathRecordRequestDTO = CreateDeathRecordPayload;

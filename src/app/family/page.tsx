@@ -461,6 +461,7 @@ import {
   promoteChildToFamilyHead,
   RelationType,
 } from "@/services/familyService";
+import { FamilyBrowser, BulkPromote } from "@/components/FamilyExtras";
 import { useTranslation } from "react-i18next";
 
 const RELATION_TYPES: RelationType[] = ["HEAD", "WIFE", "HUSBAND", "SON", "DAUGHTER", "OTHER"];
@@ -608,7 +609,20 @@ export default function FamilyManagement() {
             <TabsTrigger value="promote">
               <ArrowUpCircle className="h-4 w-4 mr-1" /> {t("Promote to Family Head")}
             </TabsTrigger>
+            <TabsTrigger value="browse">
+              <Users2 className="h-4 w-4 mr-1" /> {t("Browse Families")}
+            </TabsTrigger>
+            <TabsTrigger value="bulk">
+              <ArrowUpCircle className="h-4 w-4 mr-1" /> {t("Bulk Promote")}
+            </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="browse" className="space-y-4">
+            <FamilyBrowser />
+          </TabsContent>
+          <TabsContent value="bulk" className="space-y-4">
+            <BulkPromote />
+          </TabsContent>
 
           {/* Add Member */}
           <TabsContent value="member" className="space-y-4 max-w-2xl">

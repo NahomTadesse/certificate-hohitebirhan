@@ -86,6 +86,7 @@ function CertificatesPageWr() {
     data: any; // raw response payload from the issue endpoint (fields differ per type)
     // photos captured at generation time (so changing the dropdowns afterwards doesn't alter a printed preview)
     photos?: { main?: string | null; groom?: string | null; bride?: string | null };
+    childIds?: { main?: string; groom?: string; bride?: string }; // used to look up the English name spelling
   } | null>(null);
 
   // --- Churches dropdown (shared by the generate form and the records browser) ---
@@ -204,7 +205,8 @@ function CertificatesPageWr() {
           : type === "DEATH" && deathMemberType !== "CHILD"
           ? {}
           : { main: photoOf(childId) };
-      setGeneratedCert({ type, data: issued || {}, photos });
+      const childIds = type === "WEDDING" ? { groom: childId, bride: brideChildId } : { main: childId };
+      setGeneratedCert({ type, data: issued || {}, photos, childIds });
       toast.success(t("Certificate generated successfully!"));
       loadRecords();
     } catch (err: any) {
@@ -682,7 +684,7 @@ function CertificatesPageWr() {
               </Button>
             </div>
             <div id="certificate-preview">
-              <CertificatePaper type={generatedCert.type} data={generatedCert.data} photos={generatedCert.photos} />
+              <CertificatePaper type={generatedCert.type} data={generatedCert.data} photos={generatedCert.photos} childIds={generatedCert.childIds} />
             </div>
           </div>
         )}

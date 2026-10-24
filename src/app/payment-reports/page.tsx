@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 
 import DashboardLayout from "../dashboard/layout";
-import { fetchPaymentsReport, Payment, PaymentReportType } from "@/services/paymentService";
+import { fetchPaymentsReport, Payment, PaymentReportType, PAYMENT_FEE_TYPES } from "@/services/paymentService";
 import { useTranslation } from "react-i18next";
 
 export default function PaymentReportsPage() {
@@ -69,8 +69,11 @@ export default function PaymentReportsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="MEMBERSHIP">{t("Membership")}</SelectItem>
-                    <SelectItem value="CERTIFICATE">{t("Certificate")}</SelectItem>
+                    {PAYMENT_FEE_TYPES.map((ty) => (
+                      <SelectItem key={ty} value={ty}>
+                        {t(ty)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -107,8 +110,14 @@ export default function PaymentReportsPage() {
                         <div className="text-xs text-muted-foreground">
                           {p.periodStart} – {p.periodEnd}
                         </div>
+                        <div className="text-xs text-muted-foreground">{t(String(p.type))}</div>
                         {p.receiptNumber && (
                           <div className="text-xs text-muted-foreground">{t("Receipt")}: {p.receiptNumber}</div>
+                        )}
+                        {p.promoCode && (
+                          <div className="text-xs text-muted-foreground">
+                            {t("Promo Code")}: {p.promoCode} {p.discountAmount ? `(-${p.discountAmount})` : ""}
+                          </div>
                         )}
                       </div>
                       <div className="text-right">

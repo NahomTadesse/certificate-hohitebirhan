@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { loginUser } from "@/services/authService";
+import { loginUser, forgotPassword, verifyTemporaryPassword, setNewPassword } from "@/services/authService";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
 
@@ -20,6 +22,58 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation(); 
   const router = useRouter();
+
+  // --- Forgot password flow: request temporary password -> verify it -> set a new password ---
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotStep, setForgotStep] = useState<1 | 2>(1);
+  const [forgotBusy, setForgotBusy] = useState(false);
+  const [forgot, setForgot] = useState({ principal: "", temporaryPassword: "", newPassword: "", repeatPassword: "" });
+
+  const openForgot = () => {
+    setForgot({ principal: principal.trim(), temporaryPassword: "", newPassword: "", repeatPassword: "" });
+    setForgotStep(1);
+    setForgotOpen(true);
+  };
+
+  const handleForgotRequest = async () => {
+    if (!forgot.principal.trim()) {
+      toast.error(t("Please enter email or phone number."));
+      return;
+    }
+    setForgotBusy(true);
+    try {
+      await forgotPassword(forgot.principal.trim());
+      toast.success(t("A temporary password has been sent to you."));
+      setForgotStep(2);
+    } catch (err: any) {
+      toast.error(err.message || t("Request failed"));
+    } finally {
+      setForgotBusy(false);
+    }
+  };
+
+  const handleForgotReset = async () => {
+    if (!forgot.temporaryPassword || !forgot.newPassword) {
+      toast.error(t("Please fill all required fields"));
+      return;
+    }
+    if (forgot.newPassword !== forgot.repeatPassword) {
+      toast.error(t("Passwords do not match"));
+      return;
+    }
+    setForgotBusy(true);
+    try {
+      const payload = { ...forgot, principal: forgot.principal.trim() };
+      await verifyTemporaryPassword(payload);
+      await setNewPassword(payload);
+      toast.success(t("Password updated. You can now log in."));
+      setForgotOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || t("Request failed"));
+    } finally {
+      setForgotBusy(false);
+    }
+  };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -164,9 +218,13 @@ const Login = () => {
                 <Checkbox disabled={loading} className="border-gray-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary" />
                 {t("Remember me")}
               </Label>
-              <a href="#" className="text-secondary hover:text-secondary/80 font-medium transition">
+              <button
+                type="button"
+                onClick={openForgot}
+                className="text-secondary hover:text-secondary/80 font-medium transition"
+              >
                 {t("Forgot password?")}
-              </a>
+              </button>
             </div>
 
             {/* Login Button */}
@@ -189,6 +247,71 @@ const Login = () => {
             </Button>
           </form>
         </div>
+
+        <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{t("Forgot password?")}</DialogTitle>
+              <DialogDescription>
+                {forgotStep === 1
+                  ? t("Enter your email or phone number and we will send you a temporary password.")
+                  : t("Enter the temporary password you received and choose a new password.")}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>{t("Email or Phone Number")}</Label>
+                <Input
+                  value={forgot.principal}
+                  onChange={(e) => setForgot({ ...forgot, principal: e.target.value })}
+                  disabled={forgotStep === 2 || forgotBusy}
+                />
+              </div>
+              {forgotStep === 2 && (
+                <>
+                  <div>
+                    <Label>{t("Temporary Password")}</Label>
+                    <Input
+                      type="password"
+                      value={forgot.temporaryPassword}
+                      onChange={(e) => setForgot({ ...forgot, temporaryPassword: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("New Password")}</Label>
+                    <Input
+                      type="password"
+                      value={forgot.newPassword}
+                      onChange={(e) => setForgot({ ...forgot, newPassword: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("Repeat Password")}</Label>
+                    <Input
+                      type="password"
+                      value={forgot.repeatPassword}
+                      onChange={(e) => setForgot({ ...forgot, repeatPassword: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setForgotOpen(false)} disabled={forgotBusy}>
+                {t("Cancel")}
+              </Button>
+              {forgotStep === 1 ? (
+                <Button onClick={handleForgotRequest} disabled={forgotBusy}>
+                  {forgotBusy ? t("Sending...") : t("Send temporary password")}
+                </Button>
+              ) : (
+                <Button onClick={handleForgotReset} disabled={forgotBusy}>
+                  {forgotBusy ? t("Saving...") : t("Reset password")}
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Footer */}
         <p className="mt-8 text-xs text-center text-gray-400 font-medium">

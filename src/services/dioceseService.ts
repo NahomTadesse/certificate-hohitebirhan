@@ -56,12 +56,16 @@ export const updateDiocese = async (id: string, payload: CreateDiocesePayload): 
   });
 };
 
-// PATCH: Deactivate diocese
-export const deactivateDiocese = async (id: string): Promise<BaseResponse> => {
-  return await authenticatedFetch<BaseResponse>(`/api/v1/dioceses/${id}/deactivate`, {
+// PATCH: Deactivate / re-activate diocese. The Swagger now requires an `active` query flag
+// (PATCH /api/v1/dioceses/{id}/deactivate?active=true|false).
+export const deactivateDiocese = async (id: string, active = false): Promise<BaseResponse> => {
+  return await authenticatedFetch<BaseResponse>(`/api/v1/dioceses/${id}/deactivate?active=${active}`, {
     method: "PATCH",
   });
 };
+
+// PATCH: Re-activate a diocese (same endpoint, active=true)
+export const activateDiocese = async (id: string): Promise<BaseResponse> => deactivateDiocese(id, true);
 
 // GET: Fetch dioceses for dropdowns
 export const fetchDiocesesForDropdown = async (): Promise<{ id: string; name: string }[]> => {

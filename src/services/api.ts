@@ -48,27 +48,36 @@ export const isTokenExpired = (token: string): boolean => {
 };
 
 const refreshAccessToken = async (refreshToken: string): Promise<string> => {
-  const url = joinApiUrl("/api/auth/refresh");
-  
+  // Swagger: POST /api/v1/auth/refresh-token (the old /api/auth/refresh no longer exists).
+  // The refresh token is sent as a Bearer token; the body is also sent for servers that read it from there.
+  const url = joinApiUrl("/api/v1/auth/refresh-token");
+
   const response = await fetch(url, {
     method: "POST",
     headers: {
       accept: "*/*",
       "Content-Type": "application/json",
+      Authorization: `Bearer ${refreshToken}`,
     },
-    body: JSON.stringify({ refreshToken }),
+    body: JSON.stringify({ refreshToken, refresh_token: refreshToken }),
   });
 
   if (!response.ok) {
     throw new Error("Failed to refresh token");
   }
 
-  const result = await response.json();
-  
-  if (result.success && result.data && result.data.accessToken) {
-    return result.data.accessToken;
+  const text = await response.text();
+  const result = text ? JSON.parse(text) : {};
+  const newToken =
+    result.access_token ||
+    result.accessToken ||
+    result.data?.access_token ||
+    result.data?.accessToken;
+
+  if (newToken) {
+    return newToken;
   }
-  
+
   throw new Error("Invalid refresh response");
 };
 

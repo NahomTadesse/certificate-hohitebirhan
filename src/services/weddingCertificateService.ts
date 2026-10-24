@@ -127,3 +127,6 @@ export const revokeWeddingCertificate = async (
     body: JSON.stringify(payload),
   });
 };
+
+// Swagger schema name aliases
+export type WeddingCertificateRequestDTO = WeddingCertificatePayload;

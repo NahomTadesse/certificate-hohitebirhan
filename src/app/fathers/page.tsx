@@ -1408,6 +1408,7 @@ import {
   CalendarDays,
   MapPin,
   MoreVertical,
+  Upload,
 } from "lucide-react";
 
 import { ColumnDef } from "@tanstack/react-table";
@@ -1468,6 +1469,7 @@ import {
   fetchFathersByMonasticism,
   fetchFathersByDiocese,
   Father,
+  bulkUploadFathers,
   SpiritualInfo,
   ServiceHistory,
   Education,
@@ -1573,6 +1575,11 @@ export default function FatherManagement() {
     clericalRank: "PRIEST",
     monasticismType: "SECULAR",
     monasticName: "",
+    placeOfBirth: "",
+    nationality: "",
+    ordinationDate: "",
+    bishopName: "",
+    ordinationPlace: "",
     spiritualInfo: [defaultSpiritualInfo],
     serviceHistory: [defaultServiceHistory],
     educationList: [defaultEducation],
@@ -1845,6 +1852,25 @@ const loadData = useCallback(async (search?: string) => {
     },
   ];
 
+  // Bulk upload (POST /api/fathers/bulk-upload, multipart "file")
+  const bulkInputRef = useRef<HTMLInputElement>(null);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBulkUploading(true);
+    try {
+      const res = await bulkUploadFathers(file);
+      toast.success(res?.message || t("Fathers uploaded successfully!"));
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.message || t("Upload failed"));
+    } finally {
+      setBulkUploading(false);
+    }
+  };
+
   const handleAdd = () => {
     setFormState({
       namePrefixId: "",
@@ -1859,6 +1885,11 @@ const loadData = useCallback(async (search?: string) => {
       clericalRank: "PRIEST",
       monasticismType: "SECULAR",
       monasticName: "",
+      placeOfBirth: "",
+      nationality: "",
+      ordinationDate: "",
+      bishopName: "",
+      ordinationPlace: "",
       spiritualInfo: [defaultSpiritualInfo],
       serviceHistory: [defaultServiceHistory],
       educationList: [defaultEducation],
@@ -1976,6 +2007,20 @@ const loadData = useCallback(async (search?: string) => {
         namePrefixId: formState.namePrefixId || undefined,
         christianName: formState.christianName || undefined,
         motherName: formState.motherName || undefined,
+        placeOfBirth: formState.placeOfBirth || undefined,
+        nationality: formState.nationality || undefined,
+        dioceseId: formState.dioceseId || undefined,
+        ordinationDate: formState.ordinationDate || undefined,
+        bishopName: formState.bishopName || undefined,
+        ordinationPlace: formState.ordinationPlace || undefined,
+        ordination:
+          formState.ordinationDate || formState.bishopName || formState.ordinationPlace
+            ? {
+                ordinationDate: formState.ordinationDate || undefined,
+                bishopName: formState.bishopName || undefined,
+                ordinationPlace: formState.ordinationPlace || undefined,
+              }
+            : undefined,
       };
       // The Swagger has no father photo field, so the photo travels as a document
       // typed PROFILE_PHOTO; it is picked up again by getFatherPhotoUrl().
@@ -2039,9 +2084,21 @@ const loadData = useCallback(async (search?: string) => {
             <h1 className="text-3xl font-bold">{t("Fathers")}</h1>
             <p className="text-muted-foreground">{t("Manage spiritual fathers and their information")}</p>
           </div>
-          <Button onClick={handleAdd} size="lg">
-            <Plus className="h-5 w-5 mr-2" /> {t("Add Father")}
-          </Button>
+          <div className="flex gap-2">
+            <input
+              ref={bulkInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              onChange={handleBulkUpload}
+            />
+            <Button variant="outline" size="lg" onClick={() => bulkInputRef.current?.click()} disabled={bulkUploading}>
+              <Upload className="h-5 w-5 mr-2" /> {bulkUploading ? t("Uploading...") : t("Bulk Upload")}
+            </Button>
+            <Button onClick={handleAdd} size="lg">
+              <Plus className="h-5 w-5 mr-2" /> {t("Add Father")}
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4">
@@ -2192,7 +2249,25 @@ const loadData = useCallback(async (search?: string) => {
                       {selectedFather.ordination && (
                         <div>
                           <Label className="text-muted-foreground">{t("Ordination")}</Label>
-                          <p className="font-semibold">{selectedFather.ordination}</p>
+                          <p className="font-semibold">
+                            {[
+                              selectedFather.ordination.ordinationDate
+                                ? new Date(selectedFather.ordination.ordinationDate).toLocaleDateString()
+                                : "",
+                              selectedFather.ordination.bishopName,
+                              selectedFather.ordination.ordinationPlace,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ") || "-"}
+                          </p>
+                        </div>
+                      )}
+                      {(selectedFather.placeOfBirth || selectedFather.nationality) && (
+                        <div>
+                          <Label className="text-muted-foreground">{t("Place of Birth")} / {t("Nationality")}</Label>
+                          <p className="font-semibold">
+                            {[selectedFather.placeOfBirth, selectedFather.nationality].filter(Boolean).join(" · ")}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -2520,6 +2595,16 @@ const loadData = useCallback(async (search?: string) => {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>{t("Place of Birth")}</Label>
+                    <Input value={formState.placeOfBirth} onChange={(e) => setFormState({ ...formState, placeOfBirth: e.target.value })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{t("Nationality")}</Label>
+                    <Input value={formState.nationality} onChange={(e) => setFormState({ ...formState, nationality: e.target.value })} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <PhoneInput
                     className="space-y-1.5 [&>label]:mb-0"
                     label={t("Phone Number")}
@@ -2598,6 +2683,20 @@ const loadData = useCallback(async (search?: string) => {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>{t("Ordination Date")}</Label>
+                    <Input type="date" value={formState.ordinationDate} onChange={(e) => setFormState({ ...formState, ordinationDate: e.target.value })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{t("Ordaining Bishop")}</Label>
+                    <Input value={formState.bishopName} onChange={(e) => setFormState({ ...formState, bishopName: e.target.value })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{t("Ordination Place")}</Label>
+                    <Input value={formState.ordinationPlace} onChange={(e) => setFormState({ ...formState, ordinationPlace: e.target.value })} />
                   </div>
                 </div>
                 {formState.monasticismType === "MONK" && (

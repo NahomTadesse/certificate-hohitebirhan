@@ -1,5 +1,52 @@
 # Backend Changes Needed
 
+## 2026-10-24 update: synced with the latest Swagger
+
+### What the frontend now uses from the new Swagger
+- **New screens**: Resources (`/api/v1/resources/*`), Wedding Bookings (`/api/v1/wedding-bookings/*`),
+  Appointments (`/api/v1/appointments/*`), SMS (`/api/v1/sms/*`), Promo Codes (`/api/promo-codes`),
+  Fees (`/api/fees`, `/api/fees/standard`), Portal Links (`/api/v1/portal/*`), Child timeline
+  (`/api/v1/child-events/*`, Children > Timeline), Browse Families + Bulk Promote (`/api/families/families*`,
+  `/api/families/bulk-promote`), Fathers Bulk Upload (`/api/fathers/bulk-upload`).
+- **Payments** now match `payment-controller`: `promoCode` replaces `paymentReference`; `certificateType` is sent to
+  `/certificate`, `/certificate/waive` and `/can-issue`; `/quote`, `/receipt/{no}` and generic `POST /api/payments`
+  are wired; reports accept all 8 fee types.
+- **Children**: `firstNameEn` / `middleNameEn` / `lastNameEn` (required by the API), `placeOfBirth`, `nationality`.
+  `email` is no longer sent (not in `ChildCreateRequestDTO`).
+- **Fathers**: `placeOfBirth`, `nationality`, `ordination` / `ordinationDate` / `bishopName` / `ordinationPlace`,
+  `dioceseId`, `clericalRank`, `monasticismType` are all sent; update supports multipart.
+- **Dioceses**: deactivate sends the new required `active` flag; an Activate button was added.
+- **Auth**: Forgot-password dialog on the login page (`forgot-password` -> `verify-temporary-password` ->
+  `setnewpassword`); token refresh now calls `POST /api/v1/auth/refresh-token` (the old `/api/auth/refresh` is not in
+  the Swagger); `PUT /api/v1/auth/Update/profile` helper (with `language`).
+- **Certificates** (baptism / wedding / death) now print **bilingually** - Amharic and English labels, wording,
+  dates (Ethiopian + Gregorian) and names. English name spellings come from the child record
+  (`firstNameEn`, `middleNameEn`, `lastNameEn`).
+
+### Things to confirm / still missing on the backend
+1. **Certificate English values**: the certificate DTOs only carry one spelling per field. English is shown for the
+   person names (from the child record). Father/mother/god-parent/place/church names have no English field - if you
+   want those in English too, add e.g. `fatherNameEn`, `motherNameEn`, `placeOfBirthEn`, `churchEn` to the
+   baptism / wedding DTOs and tell the frontend.
+2. Password recovery: the exact order of `verify-temporary-password` / `set-password` / `setnewpassword` is not
+   documented. The UI calls verify then setnewpassword with the same body.
+3. `POST /api/v1/auth/refresh-token` has no request/response schema in the Swagger. The UI sends the refresh token as a
+   Bearer header (and in the body) and accepts `access_token` / `accessToken`.
+4. Response DTOs for resources-assign, bookings, appointments, child events, promo codes and SMS templates are
+   `BaseResponseDTO.data: object` in the Swagger, so list screens read common field names (`status`, `paymentStatus`,
+   `usedCount`, `active`, ...). Please add typed response DTOs.
+5. `LocalTime` fields (`bookingTime`, `requestedTime`, `eventTime`) are sent as `{hour, minute, second, nano}` per the
+   Swagger. If the server prefers `"HH:mm"` strings, tell the frontend.
+6. Still not in the Swagger (from earlier notes): `PUT /api/v1/name-prefixes/{id}`,
+   `PATCH /api/v1/name-prefixes/{id}/activate`, `PATCH /api/children/{id}/activate`, a father photo field,
+   `middleName` on users, `status` in `UserDetailDTO`, children bulk-upload, and the primary configuration page.
+7. `DELETE /api/children/{id}` and `DELETE /api/fathers/{id}` are not in the Swagger; the existing Delete buttons
+   will fail until they are added (Deactivate works).
+
+---
+
+# Backend Changes Needed
+
 ## 2026-09-30 update: name prefixes, photos, ID/certificate photos
 
 Items the frontend now expects but that are **not in the current Swagger**:

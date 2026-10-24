@@ -34,6 +34,13 @@ import {
   fetchPaymentHistory,
   fetchPaymentsReport,
   waiveCertificateFee,
+  payCertificateFee,
+  quotePayment,
+  fetchPaymentByReceipt,
+  canIssueCertificate,
+  CERTIFICATE_FEE_KINDS,
+  CertificateFeeKind,
+  certificateFeeType,
   Payment,
   PaymentReportType,
 } from "@/services/paymentService";
@@ -63,8 +70,10 @@ function PaymentsPageWra() {
     rate: "",
     type: "MONTHLY" as PaymentType,
     months: "1",
-    paymentReference: "",
+    promoCode: "",
   });
+  const [quote, setQuote] = useState<any>(null);
+  const [quoting, setQuoting] = useState(false);
 
   const loadChildren = useCallback(async () => {
     setLoadingChildren(true);
@@ -87,8 +96,8 @@ function PaymentsPageWra() {
   const total = rateNum * monthsNum;
 
   const handleSubmit = async () => {
-    if (!formState.childId || !formState.rate || !formState.months) {
-      toast.error("Please fill in child, rate, and months.");
+    if (!formState.childId || !formState.months) {
+      toast.error("Please fill in child and months.");
       return;
     }
 
@@ -96,10 +105,10 @@ function PaymentsPageWra() {
     try {
       await makePayment({
         childId: formState.childId,
-        rate: rateNum,
+        rate: formState.rate ? rateNum : undefined, // blank = standard fee
         type: formState.type,
         months: monthsNum,
-        paymentReference: formState.paymentReference || undefined,
+        promoCode: formState.promoCode.trim() || undefined,
       });
 
       const childName = children.find((c) => c.id === formState.childId)?.fullName || "-";
@@ -113,11 +122,106 @@ function PaymentsPageWra() {
       });
 
       toast.success("Payment recorded successfully!");
-      setFormState({ childId: "", rate: "", type: "MONTHLY", months: "1" });
+      setFormState({ childId: "", rate: "", type: "MONTHLY", months: "1", promoCode: "" });
+      setQuote(null);
     } catch (err: any) {
       toast.error(err.message || "Payment failed");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // --- Price quote (preview with promo code / custom rate, nothing is saved) ---
+  const handleQuote = async () => {
+    if (!formState.childId) {
+      toast.error("Select a child first.");
+      return;
+    }
+    setQuoting(true);
+    try {
+      const res = await quotePayment({
+        childId: formState.childId,
+        type: "MEMBERSHIP",
+        months: monthsNum || 1,
+        promoCode: formState.promoCode.trim() || undefined,
+        customAmount: formState.rate ? rateNum * (monthsNum || 1) : undefined,
+        customReason: formState.rate ? "Custom membership rate" : undefined,
+      });
+      setQuote(res?.data ?? res);
+    } catch (err: any) {
+      setQuote(null);
+      toast.error(err.message || "Could not get a quote");
+    } finally {
+      setQuoting(false);
+    }
+  };
+
+  // --- Pay certificate fee ---
+  const [certFee, setCertFee] = useState({
+    childId: "",
+    certificateType: "BAPTISM" as CertificateFeeKind,
+    customRate: "",
+    customReason: "",
+    promoCode: "",
+  });
+  const [certQuote, setCertQuote] = useState<any>(null);
+  const [certBusy, setCertBusy] = useState(false);
+  const [canIssue, setCanIssue] = useState<boolean | null>(null);
+
+  const handleCertQuote = async () => {
+    if (!certFee.childId) return toast.error("Select a child first.");
+    setCertBusy(true);
+    try {
+      const res = await quotePayment({
+        childId: certFee.childId,
+        type: certificateFeeType(certFee.certificateType),
+        customAmount: certFee.customRate ? parseFloat(certFee.customRate) : undefined,
+        customReason: certFee.customReason || undefined,
+        promoCode: certFee.promoCode.trim() || undefined,
+      });
+      setCertQuote(res?.data ?? res);
+      setCanIssue(await canIssueCertificate(certFee.childId, certFee.certificateType));
+    } catch (err: any) {
+      setCertQuote(null);
+      toast.error(err.message || "Could not get a quote");
+    } finally {
+      setCertBusy(false);
+    }
+  };
+
+  const handlePayCertificate = async () => {
+    if (!certFee.childId) return toast.error("Select a child first.");
+    setCertBusy(true);
+    try {
+      await payCertificateFee(
+        certFee.childId,
+        certFee.certificateType,
+        certFee.customRate ? parseFloat(certFee.customRate) : undefined,
+        certFee.customReason || undefined,
+        certFee.promoCode.trim() || undefined
+      );
+      toast.success("Certificate fee paid successfully!");
+      setCertFee({ ...certFee, customRate: "", customReason: "", promoCode: "" });
+      setCertQuote(null);
+      setCanIssue(await canIssueCertificate(certFee.childId, certFee.certificateType));
+    } catch (err: any) {
+      toast.error(err.message || "Payment failed");
+    } finally {
+      setCertBusy(false);
+    }
+  };
+
+  // --- Receipt lookup ---
+  const [receiptNo, setReceiptNo] = useState("");
+  const [receipt, setReceipt] = useState<any>(null);
+  const handleReceipt = async () => {
+    if (!receiptNo.trim()) return;
+    try {
+      const res = await fetchPaymentByReceipt(receiptNo.trim());
+      setReceipt(res?.data ?? res);
+    } catch (err: any) {
+      setReceipt(null);
+      toast.error(err.message || "Receipt not found");
     }
   };
 
@@ -142,6 +246,7 @@ function PaymentsPageWra() {
   // --- Waive certificate fee ---
   const [waiveChildId, setWaiveChildId] = useState("");
   const [waiveReason, setWaiveReason] = useState("");
+  const [waiveType, setWaiveType] = useState<CertificateFeeKind>("BAPTISM");
   const [isWaiving, setIsWaiving] = useState(false);
 
   const handleWaive = async () => {
@@ -151,7 +256,7 @@ function PaymentsPageWra() {
     }
     setIsWaiving(true);
     try {
-      await waiveCertificateFee(waiveChildId, waiveReason);
+      await waiveCertificateFee(waiveChildId, waiveType, waiveReason);
       toast.success("Certificate fee waived successfully!");
       setWaiveChildId("");
       setWaiveReason("");
@@ -249,23 +354,23 @@ function PaymentsPageWra() {
               </div>
 
               <div>
-                <Label>{t("Rate (per month)")} *</Label>
+                <Label>{t("Rate (per month)")}</Label>
                 <Input
                   type="number"
                   min={0}
                   step="0.01"
                   value={formState.rate}
                   onChange={(e) => setFormState({ ...formState, rate: e.target.value })}
-                  placeholder="0.00"
+                  placeholder={t("Leave empty to use the standard fee")}
                 />
               </div>
 
               <div>
-                <Label>{t("Payment Reference")}</Label>
+                <Label>{t("Promo Code")}</Label>
                 <Input
-                  value={formState.paymentReference}
-                  onChange={(e) => setFormState({ ...formState, paymentReference: e.target.value })}
-                  placeholder={t("Bank slip / transaction reference (optional)")}
+                  value={formState.promoCode}
+                  onChange={(e) => setFormState({ ...formState, promoCode: e.target.value })}
+                  placeholder={t("Promo code (optional)")}
                 />
               </div>
 
@@ -274,9 +379,32 @@ function PaymentsPageWra() {
                 <span className="text-2xl font-bold text-primary">{total.toFixed(2)}</span>
               </div>
 
-              <Button onClick={handleSubmit} disabled={isSubmitting} size="lg" className="w-full">
-                {isSubmitting ? t("Processing...") : t("Record Payment")}
-              </Button>
+              {quote && (
+                <div className="rounded-lg border p-3 text-sm space-y-1">
+                  <div className="font-semibold">{t("Price quote")}</div>
+                  {typeof quote === "object" ? (
+                    Object.entries(quote)
+                      .filter(([, v]) => v !== null && v !== undefined && typeof v !== "object")
+                      .map(([k, v]) => (
+                        <div key={k} className="flex justify-between">
+                          <span className="text-muted-foreground">{k}</span>
+                          <span>{String(v)}</span>
+                        </div>
+                      ))
+                  ) : (
+                    <div>{String(quote)}</div>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant="outline" onClick={handleQuote} disabled={quoting} size="lg">
+                  {quoting ? t("Loading...") : t("Get Quote")}
+                </Button>
+                <Button onClick={handleSubmit} disabled={isSubmitting} size="lg">
+                  {isSubmitting ? t("Processing...") : t("Record Payment")}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -355,6 +483,14 @@ function PaymentsPageWra() {
                         <div className="text-xs text-muted-foreground">
                           {p.periodStart} – {p.periodEnd}
                         </div>
+                        {p.receiptNumber && (
+                          <div className="text-xs text-muted-foreground">{t("Receipt")}: {p.receiptNumber}</div>
+                        )}
+                        {p.promoCode && (
+                          <div className="text-xs text-muted-foreground">
+                            {t("Promo Code")}: {p.promoCode} {p.discountAmount ? `(-${p.discountAmount})` : ""}
+                          </div>
+                        )}
                       </div>
                       <div className="text-right">
                         <div className="font-semibold">{p.amount?.toFixed?.(2) ?? p.amount}</div>
@@ -384,12 +520,145 @@ function PaymentsPageWra() {
                 />
               </div>
               <div>
+                <Label>{t("Certificate Type")} *</Label>
+                <Select value={waiveType} onValueChange={(v) => setWaiveType(v as CertificateFeeKind)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CERTIFICATE_FEE_KINDS.map((k) => (
+                      <SelectItem key={k} value={k}>
+                        {t(`CERTIFICATE_${k}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label>{t("Reason")} *</Label>
                 <Input value={waiveReason} onChange={(e) => setWaiveReason(e.target.value)} />
               </div>
               <Button variant="outline" className="w-full" onClick={handleWaive} disabled={isWaiving}>
                 {isWaiving ? t("Waiving...") : t("Waive Fee")}
               </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("Pay Certificate Fee")}</CardTitle>
+              <CardDescription>{t("Collect the fee for a certificate before it is issued")}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>{t("Child")} *</Label>
+                <SearchableSelect
+                  value={certFee.childId}
+                  onChange={(v) => setCertFee({ ...certFee, childId: v })}
+                  options={children.map((c) => ({ value: c.id, label: c.fullName }))}
+                  placeholder={t("Select a child")}
+                  searchPlaceholder={t("Search children...")}
+                />
+              </div>
+              <div>
+                <Label>{t("Certificate Type")} *</Label>
+                <Select
+                  value={certFee.certificateType}
+                  onValueChange={(v) => setCertFee({ ...certFee, certificateType: v as CertificateFeeKind })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CERTIFICATE_FEE_KINDS.map((k) => (
+                      <SelectItem key={k} value={k}>
+                        {t(`CERTIFICATE_${k}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t("Custom amount")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={certFee.customRate}
+                    onChange={(e) => setCertFee({ ...certFee, customRate: e.target.value })}
+                    placeholder={t("Standard fee")}
+                  />
+                </div>
+                <div>
+                  <Label>{t("Promo Code")}</Label>
+                  <Input value={certFee.promoCode} onChange={(e) => setCertFee({ ...certFee, promoCode: e.target.value })} />
+                </div>
+              </div>
+              {certFee.customRate && (
+                <div>
+                  <Label>{t("Reason for custom amount")}</Label>
+                  <Input value={certFee.customReason} onChange={(e) => setCertFee({ ...certFee, customReason: e.target.value })} />
+                </div>
+              )}
+              {certQuote && typeof certQuote === "object" && (
+                <div className="rounded-lg border p-3 text-sm space-y-1">
+                  <div className="font-semibold">{t("Price quote")}</div>
+                  {Object.entries(certQuote)
+                    .filter(([, v]) => v !== null && v !== undefined && typeof v !== "object")
+                    .map(([k, v]) => (
+                      <div key={k} className="flex justify-between">
+                        <span className="text-muted-foreground">{k}</span>
+                        <span>{String(v)}</span>
+                      </div>
+                    ))}
+                </div>
+              )}
+              {canIssue !== null && (
+                <Alert variant={canIssue ? "default" : "destructive"}>
+                  {canIssue ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                  <AlertDescription>
+                    {canIssue ? t("This certificate can be issued.") : t("The certificate fee has not been settled yet.")}
+                  </AlertDescription>
+                </Alert>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant="outline" onClick={handleCertQuote} disabled={certBusy}>
+                  {t("Get Quote")}
+                </Button>
+                <Button onClick={handlePayCertificate} disabled={certBusy}>
+                  {certBusy ? t("Processing...") : t("Pay Fee")}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("Find a Receipt")}</CardTitle>
+              <CardDescription>{t("Look up a payment by its receipt number")}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <Input value={receiptNo} onChange={(e) => setReceiptNo(e.target.value)} placeholder={t("Receipt number")} />
+                <Button variant="outline" onClick={handleReceipt}>
+                  {t("Search")}
+                </Button>
+              </div>
+              {receipt && typeof receipt === "object" && (
+                <div className="rounded-lg border p-3 text-sm space-y-1">
+                  {Object.entries(receipt)
+                    .filter(([, v]) => v !== null && v !== undefined && typeof v !== "object")
+                    .map(([k, v]) => (
+                      <div key={k} className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">{k}</span>
+                        <span className="text-right break-all">{String(v)}</span>
+                      </div>
+                    ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

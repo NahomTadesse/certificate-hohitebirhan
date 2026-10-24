@@ -42,6 +42,7 @@ import {
   Download,
   MoreVertical,
   Power,
+  CalendarClock,
 } from "lucide-react";
 import { useRef } from "react";
 import { useReactToPrint } from "react-to-print";
@@ -110,6 +111,7 @@ import {
   NamePrefix,
 } from "@/services/namePrefixService";
 import PhotoAvatar from "@/components/PhotoAvatar";
+import ChildTimelineDialog from "@/components/ChildTimelineDialog";
 import { resolveImageUrl } from "@/utils/imageUrl";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
@@ -133,6 +135,7 @@ export default function ChildrenManagement() {
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isIdCardDialogOpen, setIsIdCardDialogOpen] = useState(false);
+  const [isTimelineOpen, setIsTimelineOpen] = useState(false);
   const [idCardChild, setIdCardChild] = useState<Child | null>(null);
   const [idCardPhoto, setIdCardPhoto] = useState<string | null>(null);
   const idCardRef = useRef<HTMLDivElement>(null);
@@ -214,6 +217,11 @@ export default function ChildrenManagement() {
     middleName: "",
     lastName: "",
     christianName: "",
+    firstNameEn: "",
+    middleNameEn: "",
+    lastNameEn: "",
+    placeOfBirth: "",
+    nationality: "",
     motherName: "",
     email: "",
     phoneNumber: "",
@@ -490,6 +498,14 @@ export default function ChildrenManagement() {
             >
               <GitBranch className="h-4 w-4 mr-2" /> {t("Change Father")}
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                setSelectedChild(row.original);
+                setIsTimelineOpen(true);
+              }}
+            >
+              <CalendarClock className="h-4 w-4 mr-2" /> {t("Timeline")}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleViewHistory(row.original)}>
               <History className="h-4 w-4 mr-2" /> {t("Transfer History")}
             </DropdownMenuItem>
@@ -534,6 +550,11 @@ export default function ChildrenManagement() {
       middleName: "",
       lastName: "",
       christianName: "",
+      firstNameEn: "",
+      middleNameEn: "",
+      lastNameEn: "",
+      placeOfBirth: "",
+      nationality: "",
       motherName: "",
       email: "",
       phoneNumber: "",
@@ -557,6 +578,8 @@ export default function ChildrenManagement() {
     const errors: Record<string, string> = {};
     if (!formState.firstName) errors.firstName = t("First name is required");
     if (!formState.lastName) errors.lastName = t("Last name is required");
+    if (!formState.firstNameEn) errors.firstNameEn = t("First name (English) is required");
+    if (!formState.lastNameEn) errors.lastNameEn = t("Last name (English) is required");
     if (!formState.dateOfBirth) errors.dateOfBirth = t("Date of birth is required");
     if (!formState.gender) errors.gender = t("Gender is required");
     if (!formState.fatherId) errors.fatherId = t("Please select a father");
@@ -572,7 +595,7 @@ export default function ChildrenManagement() {
     const errors = validateFormState();
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) {
-      const personalFields = ["firstName", "lastName", "dateOfBirth", "gender"];
+      const personalFields = ["firstName", "lastName", "firstNameEn", "lastNameEn", "dateOfBirth", "gender"];
       if (personalFields.some((f) => errors[f])) setActiveChildTab("personal");
       else setActiveChildTab("family");
       toast.error(t("Please fill all required fields"));
@@ -1074,6 +1097,54 @@ export default function ChildrenManagement() {
                     />
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>{t("First Name (English)")} *</Label>
+                    <Input
+                      value={formState.firstNameEn}
+                      onChange={(e) => {
+                        setFormState({ ...formState, firstNameEn: e.target.value });
+                        if (formErrors.firstNameEn) setFormErrors({ ...formErrors, firstNameEn: "" });
+                      }}
+                      placeholder="First name"
+                      className={formErrors.firstNameEn ? "border-destructive focus-visible:ring-destructive" : ""}
+                    />
+                    {formErrors.firstNameEn && <p className="text-xs text-destructive">{formErrors.firstNameEn}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{t("Middle Name (English)")}</Label>
+                    <Input
+                      value={formState.middleNameEn}
+                      onChange={(e) => setFormState({ ...formState, middleNameEn: e.target.value })}
+                      placeholder="Middle name"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{t("Last Name (English)")} *</Label>
+                    <Input
+                      value={formState.lastNameEn}
+                      onChange={(e) => {
+                        setFormState({ ...formState, lastNameEn: e.target.value });
+                        if (formErrors.lastNameEn) setFormErrors({ ...formErrors, lastNameEn: "" });
+                      }}
+                      placeholder="Last name"
+                      className={formErrors.lastNameEn ? "border-destructive focus-visible:ring-destructive" : ""}
+                    />
+                    {formErrors.lastNameEn && <p className="text-xs text-destructive">{formErrors.lastNameEn}</p>}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>{t("Place of Birth")}</Label>
+                    <Input value={formState.placeOfBirth} onChange={(e) => setFormState({ ...formState, placeOfBirth: e.target.value })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{t("Nationality")}</Label>
+                    <Input value={formState.nationality} onChange={(e) => setFormState({ ...formState, nationality: e.target.value })} />
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="family" className="space-y-4 py-4">
@@ -1445,6 +1516,12 @@ export default function ChildrenManagement() {
           </DialogContent>
         </Dialog>
       </div>
+      <ChildTimelineDialog
+        open={isTimelineOpen}
+        onClose={() => setIsTimelineOpen(false)}
+        childId={selectedChild?.id}
+        childName={selectedChild?.fullName}
+      />
     </DashboardLayout>
   );
 }

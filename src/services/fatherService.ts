@@ -40,8 +40,17 @@ export interface FatherDocument {
   uploadedAt?: string;
 }
 
+export interface FatherOrdination {
+  ordinationDate?: string;
+  bishopName?: string;
+  ordinationPlace?: string;
+}
+
 export interface Father {
   id: string;
+  placeOfBirth?: string;
+  nationality?: string;
+  ordination?: FatherOrdination | null;
   namePrefixLabel?: string; // honorific returned by the API
   profileImageUrl?: string; // not in the Swagger yet - see getFatherPhotoUrl() fallback to documents[]
   documents?: FatherDocument[];
@@ -67,16 +76,27 @@ export interface Father {
   transferHistory: TransferHistory[];
 }
 
+// FatherCreateRequestDTO (swagger)
 export interface CreateFatherPayload {
   namePrefixId?: string;
   firstName: string;
-  middleName: string;
+  middleName?: string;
   lastName: string;
   christianName?: string;
   motherName?: string;
-  phoneNumber: string;
+  placeOfBirth?: string;
+  nationality?: string;
+  phoneNumber?: string;
   userId?: string;
   churchId: string;
+  dioceseId?: string;
+  clericalRank?: string;
+  monasticismType?: string;
+  monasticName?: string;
+  ordinationDate?: string;
+  bishopName?: string;
+  ordinationPlace?: string;
+  ordination?: FatherOrdination;
   spiritualInfo: SpiritualInfo[];
   serviceHistory: ServiceHistory[];
   educationList: Education[];
@@ -252,12 +272,31 @@ export const deleteFather = async (id: string): Promise<void> => {
   });
 };
 
-// PUT: Update father
-export const updateFather = async (id: string, payload: CreateFatherPayload): Promise<any> => {
+// PUT: Update father (swagger accepts JSON, or multipart: dto + documents/documentTypes)
+export const updateFather = async (
+  id: string,
+  payload: CreateFatherPayload,
+  documents?: File[],
+  documentTypes?: string[]
+): Promise<any> => {
+  if (documents && documents.length > 0) {
+    const formData = new FormData();
+    formData.append("dto", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+    documents.forEach((file) => formData.append("documents", file));
+    (documentTypes || []).forEach((dt) => formData.append("documentTypes", dt));
+    return await authenticatedFileUpload(`/api/fathers/${id}`, formData, "PUT");
+  }
   return await authenticatedFetch(`/api/fathers/${id}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
+};
+
+// POST: Bulk upload fathers from a spreadsheet (multipart "file") - /api/fathers/bulk-upload
+export const bulkUploadFathers = async (file: File): Promise<any> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return await authenticatedFileUpload("/api/fathers/bulk-upload", formData, "POST");
 };
 
 // PATCH: Transfer father to a new church
