@@ -1414,7 +1414,7 @@ export default function ChildrenManagement() {
                           {(idCardChild as any).churchName || t("Church Membership Card")}
                         </p>
                         <p className="text-xs opacity-95 mt-1">
-                          {t("Sunday School Members Identification Card")}
+                          {t("Hohite birhan Identification Card")}
                         </p>
                       </div>
                       <img
@@ -1494,7 +1494,7 @@ export default function ChildrenManagement() {
                           : ""}
                       </p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {t("This card is the property of the Sunday School and must be returned if lost membership is found.")}
+                        {t("This card is the property of the hohite birhan and must be returned if lost membership is found.")}
                       </p>
                     </div>
                   </div>
