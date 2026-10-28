@@ -94,7 +94,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 import DashboardLayout from "../dashboard/layout";
 import {
-  fetchChildren,
+  fetchChildrenPage,
   createChild,
   updateChild,
   changeFather,
@@ -121,6 +121,13 @@ export default function ChildrenManagement() {
   const [fathers, setFathers] = useState<FatherDropdownOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // server-side pagination (API pages are 0-based)
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const pageRef = useRef(0);
+  const searchRef = useRef("");
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -238,60 +245,38 @@ export default function ChildrenManagement() {
     reason: "",
   });
 
-  const loadData = useCallback(async (search?: string) => {
+  // loadData() with no args reloads the current page + current search (used after create/edit/delete).
+  const loadData = useCallback(async (search?: string, pageArg?: number) => {
+    const q = search !== undefined ? search : searchRef.current;
+    const p = pageArg !== undefined ? pageArg : pageRef.current;
+    searchRef.current = q;
+    pageRef.current = p;
     setLoading(true);
     setError(null);
     try {
-      const [childrenData, fathersData] = await Promise.all([
-        fetchChildren(search),
+      const [childrenPage, fathersData] = await Promise.all([
+        fetchChildrenPage(q, p, PAGE_SIZE),
         fetchFathersForDropdown(),
       ]);
-      
-      console.log('Children Data:', childrenData);
-      console.log('Fathers Data:', fathersData);
-      
-      // Handle paginated response for children
-      let childrenArray = [];
-      if (childrenData) {
-        if (Array.isArray(childrenData)) {
-          childrenArray = childrenData;
-        } else if (childrenData.content && Array.isArray(childrenData.content)) {
-          childrenArray = childrenData.content;
-        } else if (typeof childrenData === 'object' && childrenData !== null) {
-          // Try to find any array property
-          const possibleArrays = Object.values(childrenData).filter(val => Array.isArray(val));
-          if (possibleArrays.length > 0) {
-            childrenArray = possibleArrays[0];
-          }
-        }
+
+      // e.g. the last row of the last page was deleted - step back one page
+      if (childrenPage.content.length === 0 && p > 0 && (childrenPage.totalPages ?? 0) > 0) {
+        await loadData(q, Math.min(p - 1, (childrenPage.totalPages as number) - 1));
+        return;
       }
-      
-      // Handle paginated response for fathers
-      let fathersArray = [];
-      if (fathersData) {
-        if (Array.isArray(fathersData)) {
-          fathersArray = fathersData;
-        } else if (fathersData.content && Array.isArray(fathersData.content)) {
-          fathersArray = fathersData.content;
-        } else if (typeof fathersData === 'object' && fathersData !== null) {
-          // Try to find any array property
-          const possibleArrays = Object.values(fathersData).filter(val => Array.isArray(val));
-          if (possibleArrays.length > 0) {
-            fathersArray = possibleArrays[0];
-          }
-        }
-      }
-      
-      console.log('Processed Children:', childrenArray);
-      console.log('Processed Fathers:', fathersArray);
-      
-      setChildren(childrenArray);
-      setFathers(fathersArray);
+
+      setChildren(childrenPage.content);
+      setFathers(Array.isArray(fathersData) ? fathersData : []);
+      setPage(p);
+      setTotalPages(childrenPage.totalPages ?? 0);
+      setTotalElements(childrenPage.totalElements ?? childrenPage.content.length);
     } catch (err: any) {
       console.error('Error loading data:', err);
       setError("Failed to load data. " + err.message);
       setChildren([]);
       setFathers([]);
+      setTotalPages(0);
+      setTotalElements(0);
     } finally {
       setLoading(false);
     }
@@ -349,7 +334,7 @@ export default function ChildrenManagement() {
       return;
     }
     const handle = setTimeout(() => {
-      loadData(searchQuery);
+      loadData(searchQuery, 0);
     }, 400);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -709,7 +694,18 @@ export default function ChildrenManagement() {
             <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <DataTable columns={columns} data={filteredChildren} />
+          <DataTable
+            columns={columns}
+            data={filteredChildren}
+            pagination={{
+              page,
+              totalPages,
+              totalElements,
+              pageSize: PAGE_SIZE,
+              loading,
+              onPageChange: (p) => loadData(undefined, p),
+            }}
+          />
         )}
 
         {/* View Details Dialog */}

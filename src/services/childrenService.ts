@@ -1,4 +1,5 @@
 import { authenticatedFetch, authenticatedFileUpload } from "./api";
+import { unwrapPage, PaginatedResponse as ApiPage } from "./serviceHelpers";
 
 export interface Child {
   id: string;
@@ -120,25 +121,34 @@ const extractChildList = (response: any): Child[] => {
   return [];
 };
 
-// GET: List all children
+// GET: one page of children. Returns the whole Spring page (content + totalPages + totalElements)
+// unwrapped from the { message, success, data } envelope, so the UI can paginate.
+export const fetchChildrenPage = async (
+  search?: string,
+  page = 0,
+  size = 10,
+  sortBy = "firstName"
+): Promise<ApiPage<Child>> => {
+  // The API does not support a `search` query param on this endpoint -
+  // searching is a separate endpoint (see searchChildrenPage below).
+  if (search && search.trim()) {
+    return searchChildrenPage({ name: search.trim() }, page, size);
+  }
+  const response = await authenticatedFetch<any>(
+    `/api/children?page=${page}&size=${size}&sortBy=${encodeURIComponent(sortBy)}`
+  );
+  return unwrapPage<Child>(response);
+};
+
+// GET: List children (just the rows of one page - kept for callers that only need the array)
 export const fetchChildren = async (
   search?: string,
   page = 0,
   size = 10,
   sortBy = "firstName"
-): Promise<Child[]> => {
-  // The API does not support a `search` query param on this endpoint -
-  // searching is a separate POST endpoint (see searchChildren below).
-  if (search && search.trim()) {
-    return searchChildren({ name: search.trim() }, page, size);
-  }
-  const response = await authenticatedFetch<any>(
-    `/api/children?page=${page}&size=${size}&sortBy=${encodeURIComponent(sortBy)}`
-  );
-  return extractChildList(response);
-};
+): Promise<Child[]> => (await fetchChildrenPage(search, page, size, sortBy)).content;
 
-// Search filters accepted by POST /api/children/search
+// Search filters accepted by /api/children/search
 export interface ChildSearchFilters {
   name?: string;
   fatherId?: string;
@@ -148,14 +158,14 @@ export interface ChildSearchFilters {
   isActive?: boolean;
 }
 
-// Search children. The current Swagger declares /api/children/search as a GET (filters as query
-// params); older backend builds accepted a POST with a JSON body. Try GET first and fall back
-// to POST when the server says the method/route isn't there.
-export const searchChildren = async (
+// Search children (paginated). The current Swagger declares /api/children/search as a GET (filters
+// as query params); older backend builds accepted a POST with a JSON body. Try GET first and fall
+// back to POST when the server says the method/route isn't there.
+export const searchChildrenPage = async (
   filters: ChildSearchFilters,
   page = 0,
   size = 10
-): Promise<Child[]> => {
+): Promise<ApiPage<Child>> => {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== "") params.set(k, String(v));
@@ -164,16 +174,19 @@ export const searchChildren = async (
   params.set("size", String(size));
   try {
     const response = await authenticatedFetch<any>(`/api/children/search?${params.toString()}`);
-    return extractChildList(response);
+    return unwrapPage<Child>(response);
   } catch (err: any) {
     if (![404, 405, 415].includes(err?.status)) throw err;
     const response = await authenticatedFetch<any>(`/api/children/search?page=${page}&size=${size}`, {
       method: "POST",
       body: JSON.stringify(filters),
     });
-    return extractChildList(response);
+    return unwrapPage<Child>(response);
   }
 };
+
+export const searchChildren = async (filters: ChildSearchFilters, page = 0, size = 10): Promise<Child[]> =>
+  (await searchChildrenPage(filters, page, size)).content;
 
 export interface ChildDropdownOption {
   id: string;

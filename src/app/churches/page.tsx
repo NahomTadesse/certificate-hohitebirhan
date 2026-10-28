@@ -103,7 +103,7 @@ export default function ChurchManagement() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchChurches(0, 100, search);
+      const response = await fetchChurches(0, 1000, search);
       setChurches(response.data || []);
     } catch (err: any) {
       setError("Failed to load churches. " + err.message);
@@ -362,7 +362,7 @@ export default function ChurchManagement() {
             <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <DataTable columns={columns} data={filteredChurches} />
+          <DataTable columns={columns} data={filteredChurches} clientPageSize={10} />
         )}
 
         {/* Add/Edit Dialog */}

@@ -1505,6 +1505,13 @@ export default function FatherManagement() {
   const [churches, setChurches] = useState<{ id: string; name: string }[]>([]);
   const [dioceses, setDioceses] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  // server-side pagination (API pages are 0-based)
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const pageRef = useRef(0);
+  const searchRef = useRef("");
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
@@ -1585,41 +1592,44 @@ export default function FatherManagement() {
     educationList: [defaultEducation],
   });
 
-const loadData = useCallback(async (search?: string) => {
+// loadData() with no args reloads the current page + current search (used after create/edit/delete).
+const loadData = useCallback(async (search?: string, pageArg?: number) => {
+  const q = search !== undefined ? search : searchRef.current;
+  const p = pageArg !== undefined ? pageArg : pageRef.current;
+  searchRef.current = q;
+  pageRef.current = p;
   setLoading(true);
   setError(null);
   try {
-    const [fathersData, churchesData, diocesesData] = await Promise.all([
-      fetchFathers(search),
+    const [fathersPage, churchesData, diocesesData] = await Promise.all([
+      fetchFathers(q, p, PAGE_SIZE),
       fetchChurchesForDropdown(),
       fetchDiocesesForDropdown(),
     ]);
-    
-    // Extract and transform the data
-    let fathersArray = [];
-    if (fathersData) {
-      if (Array.isArray(fathersData)) {
-        fathersArray = fathersData;
-      } else if (fathersData.content && Array.isArray(fathersData.content)) {
-        // Transform the data to include fullName
-        fathersArray = fathersData.content.map((father: any) => ({
-          ...father,
-          fullName: [father.firstName, father.middleName, father.lastName]
-            .filter(Boolean) // Remove null/undefined
-            .join(' ')
-        }));
-      } else {
-        fathersArray = [];
-      }
+
+    // e.g. the last row of the last page was deleted - step back one page
+    if ((fathersPage.content || []).length === 0 && p > 0 && (fathersPage.totalPages ?? 0) > 0) {
+      await loadData(q, Math.min(p - 1, fathersPage.totalPages - 1));
+      return;
     }
-    
+
+    const fathersArray = (fathersPage.content || []).map((father: any) => ({
+      ...father,
+      fullName: [father.firstName, father.middleName, father.lastName].filter(Boolean).join(' '),
+    }));
+
     setFathers(fathersArray);
+    setPage(p);
+    setTotalPages(fathersPage.totalPages ?? 0);
+    setTotalElements(fathersPage.totalElements ?? fathersArray.length);
     setChurches(churchesData || []);
     setDioceses(diocesesData || []);
   } catch (err: any) {
     console.error('Error loading data:', err);
     setError("Failed to load data. " + err.message);
     setFathers([]);
+    setTotalPages(0);
+    setTotalElements(0);
   } finally {
     setLoading(false);
   }
@@ -1646,7 +1656,7 @@ const loadData = useCallback(async (search?: string) => {
       return;
     }
     const handle = setTimeout(() => {
-      loadData(searchQuery);
+      loadData(searchQuery, 0);
     }, 400);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1665,30 +1675,43 @@ const loadData = useCallback(async (search?: string) => {
   };
 
   const applyFilters = useCallback(
-    async (rank: string, monasticism: string) => {
-      // If both filters are ALL, just reload the full list
+    async (rank: string, monasticism: string, pageArg?: number) => {
+      // If both filters are ALL, just reload the paged list
       if (rank === "ALL" && monasticism === "ALL") {
-        await loadData();
+        await loadData(searchRef.current, pageArg);
         return;
       }
+      const p = pageArg !== undefined ? pageArg : pageRef.current;
+      pageRef.current = p;
       setLoading(true);
       setError(null);
       try {
-        let result: any = null;
-        if (rank !== "ALL") {
-          result = await fetchFathersByRank(rank);
-        } else if (monasticism !== "ALL") {
-          result = await fetchFathersByMonasticism(monasticism);
-        }
+        const both = rank !== "ALL" && monasticism !== "ALL";
+        // Both filters set: the API can only filter by one, so pull a big page and narrow
+        // client-side (everything fits on one page in that case).
+        const size = both ? 1000 : PAGE_SIZE;
+        const reqPage = both ? 0 : p;
+        const result: any =
+          rank !== "ALL"
+            ? await fetchFathersByRank(rank, reqPage, size)
+            : await fetchFathersByMonasticism(monasticism, reqPage, size);
         let list = normalizeFatherPage(result);
-        // If both set, further narrow client-side by monasticism/rank
-        if (rank !== "ALL" && monasticism !== "ALL") {
+        if (both) {
           list = list.filter((f: any) => f.monasticismType === monasticism);
+          setPage(0);
+          setTotalPages(list.length ? 1 : 0);
+          setTotalElements(list.length);
+        } else {
+          setPage(p);
+          setTotalPages(result?.totalPages ?? 1);
+          setTotalElements(result?.totalElements ?? list.length);
         }
         setFathers(list);
       } catch (err: any) {
         setError("Failed to filter fathers. " + err.message);
         setFathers([]);
+        setTotalPages(0);
+        setTotalElements(0);
       } finally {
         setLoading(false);
       }
@@ -1697,7 +1720,7 @@ const loadData = useCallback(async (search?: string) => {
   );
 
   useEffect(() => {
-    applyFilters(rankFilter, monasticismFilter);
+    applyFilters(rankFilter, monasticismFilter, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rankFilter, monasticismFilter]);
 
@@ -2148,7 +2171,18 @@ const loadData = useCallback(async (search?: string) => {
             <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <DataTable columns={columns} data={filteredFathers} />
+          <DataTable
+            columns={columns}
+            data={filteredFathers}
+            pagination={{
+              page,
+              totalPages,
+              totalElements,
+              pageSize: PAGE_SIZE,
+              loading,
+              onPageChange: (p) => applyFilters(rankFilter, monasticismFilter, p),
+            }}
+          />
         )}
 
         {/* View Father Dialog */}

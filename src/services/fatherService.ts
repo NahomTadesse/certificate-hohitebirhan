@@ -1,4 +1,5 @@
 
+import { unwrapPage } from "./serviceHelpers";
 
 import { authenticatedFetch, authenticatedFileUpload } from "./api";
 
@@ -132,6 +133,10 @@ export interface PaginatedResponse<T> {
   empty: boolean;
 }
 
+// Accepts either a bare Spring page or one wrapped in { message, success, data }.
+const asFatherPage = (response: any): PaginatedResponse<Father> =>
+  unwrapPage<Father>(response) as unknown as PaginatedResponse<Father>;
+
 // GET: List all fathers (returns paginated response)
 export const fetchFathers = async (
   search?: string,
@@ -147,7 +152,7 @@ export const fetchFathers = async (
   const response = await authenticatedFetch<PaginatedResponse<Father>>(
     `/api/fathers?page=${page}&size=${size}&sortBy=${encodeURIComponent(sortBy)}`
   );
-  return response || { content: [], totalElements: 0, totalPages: 0, empty: true } as PaginatedResponse<Father>;
+  return asFatherPage(response);
 };
 
 // Search filters accepted by POST /api/fathers/search
@@ -179,14 +184,14 @@ export const searchFathers = async (
     const response = await authenticatedFetch<PaginatedResponse<Father>>(
       `/api/fathers/search?${params.toString()}`
     );
-    return response || empty;
+    return response ? asFatherPage(response) : empty;
   } catch (err: any) {
     if (![404, 405, 415].includes(err?.status)) throw err;
     const response = await authenticatedFetch<PaginatedResponse<Father>>(
       `/api/fathers/search?page=${page}&size=${size}`,
       { method: "POST", body: JSON.stringify(filters) }
     );
-    return response || empty;
+    return response ? asFatherPage(response) : empty;
   }
 };
 
@@ -210,7 +215,7 @@ export interface FatherDropdownOption {
 // GET: Get fathers for dropdown (simplified - extracts from paginated response)
 export const fetchFathersForDropdown = async (): Promise<FatherDropdownOption[]> => {
   // large page: the API defaults to 10 per page, so fathers after the 10th were missing from dropdowns
-  const response = await authenticatedFetch<PaginatedResponse<Father>>("/api/fathers?page=0&size=1000");
+  const response = asFatherPage(await authenticatedFetch<any>("/api/fathers?page=0&size=1000"));
   
   // Check if response exists and has content
   if (response && response.content && Array.isArray(response.content)) {
@@ -314,15 +319,15 @@ export const deactivateFather = async (id: string): Promise<any> => {
 };
 
 // GET: Fathers by clerical rank (paginated)
-export const fetchFathersByRank = async (rank: string): Promise<PaginatedResponse<Father>> => {
-  const response = await authenticatedFetch<PaginatedResponse<Father>>(`/api/fathers/rank/${rank}`);
-  return response || ({ content: [], totalElements: 0, totalPages: 0, empty: true } as PaginatedResponse<Father>);
+export const fetchFathersByRank = async (rank: string, page = 0, size = 10): Promise<PaginatedResponse<Father>> => {
+  const response = await authenticatedFetch<any>(`/api/fathers/rank/${rank}?page=${page}&size=${size}`);
+  return asFatherPage(response);
 };
 
 // GET: Fathers by monasticism type (paginated)
-export const fetchFathersByMonasticism = async (type: string): Promise<PaginatedResponse<Father>> => {
-  const response = await authenticatedFetch<PaginatedResponse<Father>>(`/api/fathers/monasticism/${type}`);
-  return response || ({ content: [], totalElements: 0, totalPages: 0, empty: true } as PaginatedResponse<Father>);
+export const fetchFathersByMonasticism = async (type: string, page = 0, size = 10): Promise<PaginatedResponse<Father>> => {
+  const response = await authenticatedFetch<any>(`/api/fathers/monasticism/${type}?page=${page}&size=${size}`);
+  return asFatherPage(response);
 };
 
 // GET: Fathers by diocese (paginated)

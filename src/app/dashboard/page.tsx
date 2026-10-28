@@ -177,8 +177,8 @@ export default function Dashboard() {
     try {
       const [churchesRes, fathersRes, childrenRes, diocesesRes] = await Promise.allSettled([
         fetchChurches(0, 1000),
-        fetchFathers(),
-        fetchChildren(),
+        fetchFathers(undefined, 0, 1000),
+        fetchChildren(undefined, 0, 1000),
         fetchDioceses(),
       ]);
 
