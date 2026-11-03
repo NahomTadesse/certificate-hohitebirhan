@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -1405,12 +1403,12 @@ export default function ChildrenManagement() {
                   >
                     {/* Header */}
                     <div className="bg-[#4d8f96] text-white px-4 py-3 flex items-start justify-between gap-3">
-                      <div>
+                      <div className="flex-1 text-center">
                         <p className="text-sm font-bold leading-snug">
-                          {(idCardChild as any).churchName || t("Church Membership Card")}
+                          በኢትዮጵያ ኦርቶዶክስ ተዋሕዶ ቤተክርስቲያን የሰበካ መንፈሳዊ ጉባኤ የአባልነት መታወቂያ
                         </p>
                         <p className="text-xs opacity-95 mt-1">
-                          {t("Hohite birhan Identification Card")}
+                          The Ethiopian Orthodox Tewahedo Church Parish Spiritual Council Membership Identification Card
                         </p>
                       </div>
                       <img
@@ -1429,9 +1427,9 @@ export default function ChildrenManagement() {
                           alt="QR code"
                           className="h-[130px] w-[130px] border"
                         />
-                        <p className="text-[10px] text-muted-foreground">
+                        {/* <p className="text-[10px] text-muted-foreground">
                           {t("Validity")}: {new Date().getFullYear()}
-                        </p>
+                        </p> */}
                       </div>
 
                       {/* Fields */}
@@ -1483,14 +1481,17 @@ export default function ChildrenManagement() {
 
                     {/* Footer */}
                     <div className="bg-[#eef3f6] px-4 py-2 text-center border-t">
-                      <p className="text-xs font-medium">
+                      {/* <p className="text-xs font-medium">
                         {t("Contact")}: {(idCardChild as any).contactPhone1 || "-"}
                         {(idCardChild as any).contactPhone2
                           ? ` | ${(idCardChild as any).contactPhone2}`
                           : ""}
+                      </p> */}
+                      <p className="text-[8px] leading-tight text-muted-foreground mt-1">
+                        ይህን መታወቂያ የያዘ ክርስቲያን ምናልባት በእግድነትና በማይታወቅበት ሰበካ ከዚህ ዓለም በሞት ቢለይ በአቅራቢያው ያሉ ካህናትና ምእመናን ይህ ምልክት አይተው ጸሎተ ፍትሐተሰ ይፈጽሙ።
                       </p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {t("This card is the property of the hohite birhan and must be returned if lost membership is found.")}
+                      <p className="text-[8px] leading-tight text-muted-foreground mt-0.5">
+                        If a Christian holding this identification card passes away in a foreign land or in an another parish, the clergy and faithful nearby should perform the funeral/absolution prayers (Tselote Fithat) upon seeing this emblem.
                       </p>
                     </div>
                   </div>
