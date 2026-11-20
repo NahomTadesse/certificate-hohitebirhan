@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Eye,
   ScrollText,
+  PenLine,
 } from "lucide-react";
 
 import { ColumnDef } from "@tanstack/react-table";
@@ -35,6 +36,7 @@ import {
 } from "@/components/ui/dialog";
 
 import DashboardLayout from "../dashboard/layout";
+import ManualCertificateDialog from "@/components/ManualCertificateDialog";
 import {
   fetchWeddingCertificates,
   searchWeddingCertificates,
@@ -90,6 +92,7 @@ export default function WeddingCertificatesManagement() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [manualOpen, setManualOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isRevokeDialogOpen, setIsRevokeDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<WeddingRecord | null>(null);
@@ -315,6 +318,9 @@ export default function WeddingCertificatesManagement() {
           {/* <Button onClick={handleAdd} size="lg" disabled={!churchId} style={{ backgroundColor: CERT_COLOR }}>
             <Plus className="h-5 w-5 mr-2" /> {t("Issue Certificate")}
           </Button> */}
+          <Button onClick={() => setManualOpen(true)} size="lg" variant="outline">
+            <PenLine className="h-5 w-5 mr-2" /> {t("Manual Certificate")}
+          </Button>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4">
@@ -529,6 +535,15 @@ export default function WeddingCertificatesManagement() {
             data={viewRecord}
           />
         )}
+
+        <ManualCertificateDialog
+          open={manualOpen}
+          onClose={() => setManualOpen(false)}
+          defaultType="WEDDING"
+          allowedTypes={["WEDDING"]}
+          defaultChurchName={churches.find((c) => c.id === churchId)?.name || ""}
+          onCreated={() => loadRecords()}
+        />
 
         {/* Revoke Dialog */}
         <Dialog open={isRevokeDialogOpen} onOpenChange={setIsRevokeDialogOpen}>

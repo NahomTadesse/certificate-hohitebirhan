@@ -14,6 +14,7 @@ import {
   Award,
   ShieldCheck,
   Eye,
+  PenLine,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/select";
 
 import DashboardLayout from "../dashboard/layout";
+import ManualCertificateDialog from "@/components/ManualCertificateDialog";
 import {
   issueBaptismCertificate,
   verifyBaptismCertificate,
@@ -284,6 +286,7 @@ function CertificatesPageWr() {
   }, [loadRecords]);
 
   // --- "Show certificate" for a saved record in the list ---
+  const [manualOpen, setManualOpen] = useState(false);
   const [viewCert, setViewCert] = useState<{ type: CertificateType; data: any; photos: CertPhotos } | null>(null);
 
   const openRecord = (recType: CertificateType, r: any) => {
@@ -307,12 +310,27 @@ function CertificatesPageWr() {
   return (
     <DashboardLayout>
       <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <FileText className="h-8 w-8 text-primary" /> {t("Certificates")}
-          </h1>
-          <p className="text-muted-foreground">{t("Generate official certificates for children")}</p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <FileText className="h-8 w-8 text-primary" /> {t("Certificates")}
+            </h1>
+            <p className="text-muted-foreground">{t("Generate official certificates for children")}</p>
+          </div>
+          <Button onClick={() => setManualOpen(true)} size="lg" variant="outline">
+            <PenLine className="h-5 w-5 mr-2" /> {t("Manual Certificate")}
+          </Button>
         </div>
+
+
+        <ManualCertificateDialog
+          open={manualOpen}
+          onClose={() => setManualOpen(false)}
+          defaultType="BAPTISM"
+          allowedTypes={["BAPTISM", "BIRTH", "WEDDING", "DEATH"]}
+          defaultChurchName={churches.find((c) => c.id === recordsChurchId)?.name || ""}
+          onCreated={() => loadRecords()}
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {certificateOptions.map((opt) => {

@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Eye,
   ScrollText,
+  PenLine,
 } from "lucide-react";
 
 import { ColumnDef } from "@tanstack/react-table";
@@ -35,6 +36,7 @@ import {
 } from "@/components/ui/dialog";
 
 import DashboardLayout from "../dashboard/layout";
+import ManualCertificateDialog from "@/components/ManualCertificateDialog";
 import {
   fetchBaptismCertificates,
   searchBaptismCertificates,
@@ -95,6 +97,7 @@ export default function BaptismCertificatesManagement() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [revokeReason, setRevokeReason] = useState("");
 
+  const [manualOpen, setManualOpen] = useState(false);
   const [issueChildId, setIssueChildId] = useState("");
   const [formState, setFormState] = useState<BaptismCertificatePayload>(emptyForm);
 
@@ -314,6 +317,9 @@ export default function BaptismCertificatesManagement() {
           {/* <Button onClick={handleAdd} size="lg" disabled={!churchId} style={{ backgroundColor: CERT_COLOR }}>
             <Plus className="h-5 w-5 mr-2" /> {t("Issue Certificate")}
           </Button> */}
+          <Button onClick={() => setManualOpen(true)} size="lg" variant="outline">
+            <PenLine className="h-5 w-5 mr-2" /> {t("Manual Certificate")}
+          </Button>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4">
@@ -494,6 +500,15 @@ export default function BaptismCertificatesManagement() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <ManualCertificateDialog
+          open={manualOpen}
+          onClose={() => setManualOpen(false)}
+          defaultType="BAPTISM"
+          allowedTypes={["BAPTISM", "BIRTH"]}
+          defaultChurchName={churches.find((c) => c.id === churchId)?.name || ""}
+          onCreated={() => loadRecords()}
+        />
 
         {viewRecord && (
           <CertificateViewDialog

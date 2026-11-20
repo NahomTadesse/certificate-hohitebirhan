@@ -66,3 +66,50 @@ export const fetchCertificatePrintHistory = async (childId: string): Promise<Bas
 export const checkCertificateEligibility = async (childId: string): Promise<BaseResponse> => {
   return await authenticatedFetch<BaseResponse>(`/api/v1/children/${childId}/certificate-eligibility`);
 };
+
+// ---- Manual certificate (Swagger: POST /api/certificates/manual -> ManualCertificateRequestDTO) ----
+export interface ManualCertificatePayload {
+  type: CertificateType; // required
+  firstName: string; // required
+  middleName?: string;
+  lastName: string; // required
+  firstNameEn?: string;
+  middleNameEn?: string;
+  lastNameEn?: string;
+  gender: "MALE" | "FEMALE"; // required
+  dateOfBirth: string; // required (yyyy-MM-dd)
+  phoneNumber?: string;
+  christianName?: string;
+  namePrefixLabel?: string;
+  motherName?: string;
+  placeOfBirth?: string;
+  nationality?: string;
+  fatherFullName: string; // required
+  godParentName?: string;
+  country?: string;
+  citizenship?: string;
+  originChurchName: string; // required
+  originChurchAddress?: string;
+  officiatingPriestName?: string;
+  officiatingPriestRank?: string;
+  eventDate: string; // required (yyyy-MM-dd)
+  receiptNumber?: string;
+  feeNote?: string;
+  notes?: string;
+  confirmDuplicate?: boolean;
+}
+
+// POST: Manually generate a certificate (for records not stored as a child in the system)
+export const generateManualCertificate = async (
+  payload: ManualCertificatePayload
+): Promise<BaseResponse> => {
+  // Drop empty optional strings so the backend does not store "" values
+  const body: Record<string, any> = {};
+  Object.entries(payload).forEach(([k, v]) => {
+    if (v !== "" && v !== undefined && v !== null) body[k] = v;
+  });
+  return await authenticatedFetch<BaseResponse>(`/api/certificates/manual`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+};

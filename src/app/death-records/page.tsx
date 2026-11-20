@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Eye,
   ScrollText,
+  PenLine,
 } from "lucide-react";
 
 import { ColumnDef } from "@tanstack/react-table";
@@ -39,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 
 import DashboardLayout from "../dashboard/layout";
+import ManualCertificateDialog from "@/components/ManualCertificateDialog";
 import {
   fetchDeathRecords,
   fetchDeathRecordsByMemberType,
@@ -95,6 +97,7 @@ export default function DeathRecordsManagement() {
   };
   const [formState, setFormState] = useState(emptyForm);
 
+  const [manualOpen, setManualOpen] = useState(false);
   const loadRecords = useCallback(async (search?: string) => {
     setLoading(true);
     setError(null);
@@ -317,9 +320,14 @@ export default function DeathRecordsManagement() {
               {t("Record, verify, and manage death records for members, family heads, and clergy")}
             </p>
           </div>
-          <Button onClick={handleAdd} size="lg">
-            <Plus className="h-5 w-5 mr-2" /> {t("Record Death")}
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setManualOpen(true)} size="lg" variant="outline">
+              <PenLine className="h-5 w-5 mr-2" /> {t("Manual Certificate")}
+            </Button>
+            <Button onClick={handleAdd} size="lg">
+              <Plus className="h-5 w-5 mr-2" /> {t("Record Death")}
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4">
@@ -497,6 +505,14 @@ export default function DeathRecordsManagement() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <ManualCertificateDialog
+          open={manualOpen}
+          onClose={() => setManualOpen(false)}
+          defaultType="DEATH"
+          allowedTypes={["DEATH"]}
+          onCreated={() => loadRecords()}
+        />
       </div>
     </DashboardLayout>
   );
