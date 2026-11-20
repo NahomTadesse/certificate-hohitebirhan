@@ -23,6 +23,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { CertificateViewDialog } from "@/components/CertificateView";
+import { manualToCertificateRecord } from "@/utils/manualCertificate";
 import {
   generateManualCertificate,
   CertificateType,
@@ -100,6 +102,8 @@ export default function ManualCertificateDialog({
   const [form, setForm] = useState<ManualCertificatePayload>(emptyForm(defaultType));
   const [submitting, setSubmitting] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+  // the generated certificate, shown like a normal one right after saving
+  const [generated, setGenerated] = useState<{ type: CertificateType; data: any } | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -154,6 +158,11 @@ export default function ManualCertificateDialog({
         return;
       }
       toast.success(res?.message || t("Manual certificate generated successfully!"));
+      const saved: any = (res as any)?.data;
+      if (saved) {
+        const kind = (saved.type || form.type) as CertificateType;
+        setGenerated({ type: kind, data: manualToCertificateRecord(saved, kind) });
+      }
       onCreated?.(res);
       onClose();
     } catch (err: any) {
@@ -166,6 +175,7 @@ export default function ManualCertificateDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
@@ -273,5 +283,15 @@ export default function ManualCertificateDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {generated && (
+      <CertificateViewDialog
+        open
+        onClose={() => setGenerated(null)}
+        type={generated.type}
+        data={generated.data}
+      />
+    )}
+    </>
   );
 }

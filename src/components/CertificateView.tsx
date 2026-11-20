@@ -391,7 +391,7 @@ import { fetchChildById } from "@/services/childrenService";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-export type CertKind = "BAPTISM" | "WEDDING" | "DEATH";
+export type CertKind = "BAPTISM" | "BIRTH" | "WEDDING" | "DEATH";
 
 export interface CertPhotos {
   main?: string | null;
@@ -409,12 +409,14 @@ const PAPER_H = 793;
 
 export const CERT_TITLES: Record<CertKind, string> = {
   BAPTISM: "Baptism Certificate",
+  BIRTH: "Birth Certificate",
   WEDDING: "Wedding Certificate",
   DEATH: "Death Certificate",
 };
 
 const PAPER_TITLES_EN: Record<CertKind, string> = {
   BAPTISM: "BAPTISMAL CERTIFICATE",
+  BIRTH: "BIRTH CERTIFICATE",
   WEDDING: "MARRIAGE CERTIFICATE",
   DEATH: "DEATH CERTIFICATE",
 };
@@ -572,6 +574,21 @@ const getFields = (type: CertKind, d: any, en: Record<string, string>): CertFiel
     en: enLabel,
     date: value || "",
   });
+  if (type === "BIRTH") {
+    return [
+      f("familyName", "የቤተሰብ ስም", "Family Name", d.familyName),
+      f("properName", "የተጸውዖ ስም", "Proper Name", d.properName),
+      f("christianName", "ክርስትና ስም", "Christian Name", d.christianName),
+      f("fatherName", "የአባት ስም", "Father's Name", d.fatherName),
+      f("motherName", "የእናት ስም", "Mother's Name", d.motherName),
+      f("country", "ሀገር", "Country", d.country),
+      f("placeOfBirth", "የተወለደበት(ችበት) ቦታ", "Place of Birth", d.placeOfBirth),
+      f("nationality", "የትውልድ ሀገር", "Nationality", d.nationality),
+      dt("dateOfBirth", "የተወለደበት(ችበት) ቀን", "Date of Birth", d.dateOfBirth),
+      f("church", "የመዝገብ ቤተ ክርስቲያን", "Church", d.church),
+      f("citizenship", "ዜግነት", "Citizenship", d.citizenship),
+    ];
+  }
   if (type === "BAPTISM") {
     return [
       f("familyName", "የቤተሰብ ስም", "Family Name", d.familyName),
@@ -620,13 +637,13 @@ const getFields = (type: CertKind, d: any, en: Record<string, string>): CertFiel
 
 const getSubject = (type: CertKind, d: any, en: Record<string, string>) => {
   const am =
-    type === "BAPTISM"
+    type === "BAPTISM" || type === "BIRTH"
       ? `${d.properName || ""} ${d.familyName || ""}`.trim()
       : type === "WEDDING"
       ? `${d.groomFullName || ""} & ${d.brideFullName || ""}`.trim()
       : d.fullName || d.memberName || "";
   const eng =
-    type === "BAPTISM"
+    type === "BAPTISM" || type === "BIRTH"
       ? `${en.properName || ""} ${en.familyName || ""}`.trim()
       : type === "WEDDING"
       ? en.groomFullName && en.brideFullName
@@ -637,9 +654,13 @@ const getSubject = (type: CertKind, d: any, en: Record<string, string>) => {
 };
 
 const getEventDate = (type: CertKind, d: any) =>
-  type === "BAPTISM" ? d.dateOfBaptism : type === "WEDDING" ? d.dateOfMarriage : d.dateOfDeath;
+  type === "BIRTH" ? d.dateOfBirth : type === "BAPTISM" ? d.dateOfBaptism : type === "WEDDING" ? d.dateOfMarriage : d.dateOfDeath;
 
 const SENTENCE: Record<CertKind, { am: string; en: string }> = {
+  BIRTH: {
+    am: "በኢትዮጵያ ኦርቶዶክስ ተዋሕዶ ቤተ ክርስቲያን መዝገብ መሠረት ከላይ በተገለጸው ቦታና ቀን መወለዱን(ዷን) እናረጋግጣለን።",
+    en: "was born at the above mentioned place and date, as recorded in the records of Ethiopian Orthodox Tewahido Church.",
+  },
   BAPTISM: {
     am: "በኢትዮጵያ ኦርቶዶክስ ተዋሕዶ ቤተ ክርስቲያን ሥርዓትና ሕግ መሠረት ከላይ በተገለጸው ቦታና ቀን መጠመቁን(ቋን) እናረጋግጣለን።",
     en: "is baptized according to the Law and Order of Ethiopian Orthodox Tewahido Church at the above mentioned place and date.",
@@ -656,6 +677,7 @@ const SENTENCE: Record<CertKind, { am: string; en: string }> = {
 
 const CERT_TITLES_AM: Record<CertKind, string> = {
   BAPTISM: "የጥምቀት የምስክር ወረቀት",
+  BIRTH: "የልደት የምስክር ወረቀት",
   WEDDING: "የጋብቻ የምስክር ወረቀት",
   DEATH: "የሞት የምስክር ወረቀት",
 };
@@ -669,6 +691,7 @@ const VERSES: Record<CertKind, { am: string; en: string }> = {
     am: "«እግዚአብሔር አንድ ያደረገውን ሰው አይለየው» (ማቴ. ፲፱፥፮)",
     en: "Those whom God has joined together let no man put asunder. (Mt. 19.6)",
   },
+  BIRTH: { am: "", en: "" },
   DEATH: { am: "", en: "" },
 };
 
@@ -767,7 +790,8 @@ interface CertificatePaperProps {
 export const CertificatePaper = forwardRef<HTMLDivElement, CertificatePaperProps>(
   ({ type, data, photos, childIds }, ref) => {
     const d = data || {};
-    const [en, setEn] = useState<Record<string, string>>({});
+    const [enFetched, setEn] = useState<Record<string, string>>({});
+    const en: Record<string, string> = { ...enFetched, ...(d.__en || {}) };
     const { holder, scale } = useFitScale();
 
     const mainId = childIds?.main || d.childId || (type === "DEATH" && (!d.memberType || d.memberType === "CHILD") ? d.memberId : undefined);
@@ -789,7 +813,7 @@ export const CertificatePaper = forwardRef<HTMLDivElement, CertificatePaperProps
           } else if (mainId) {
             const c: any = await fetchChildById(mainId).catch(() => null);
             if (c && enName(c)) {
-              if (type === "BAPTISM") {
+              if (type === "BAPTISM" || type === "BIRTH") {
                 if (c.firstNameEn) out.properName = c.firstNameEn;
                 if (c.lastNameEn) out.familyName = c.lastNameEn;
               } else {
@@ -845,7 +869,7 @@ export const CertificatePaper = forwardRef<HTMLDivElement, CertificatePaperProps
                       className="flex-1 font-mono font-semibold px-1"
                       style={{ borderBottom: `1.5px dotted ${CERT_COLOR}`, color: INK, minHeight: 18, fontSize: 12 }}
                     >
-                      {d.registrationNo || ""}
+                      {d.registrationNo || d.certificateNumber || ""}
                     </span>
                   </div>
                   {verse.am && (
@@ -957,7 +981,7 @@ export function CertificateViewDialog({ open, onClose, type, data, photos }: Cer
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: `${type.toLowerCase()}-certificate-${data?.registrationNo || ""}`,
+    documentTitle: `${type.toLowerCase()}-certificate-${data?.registrationNo || data?.certificateNumber || ""}`,
     pageStyle:
       "@page { size: A4 landscape; margin: 0; } html, body { margin: 0; padding: 0; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }",
   });
