@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import DashboardLayout from "../dashboard/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateInput from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -270,11 +271,11 @@ export default function PromoCodesPage() {
               </div>
               <div>
                 <Label>{t("Valid From")}</Label>
-                <Input type="date" value={form.validFrom} onChange={(e) => setForm({ ...form, validFrom: e.target.value })} />
+                <DateInput value={form.validFrom} onChange={(e) => setForm({ ...form, validFrom: e.target.value })} />
               </div>
               <div>
                 <Label>{t("Valid To")}</Label>
-                <Input type="date" value={form.validTo} onChange={(e) => setForm({ ...form, validTo: e.target.value })} />
+                <DateInput value={form.validTo} onChange={(e) => setForm({ ...form, validTo: e.target.value })} />
               </div>
             </div>
             <div className="flex items-center gap-2">

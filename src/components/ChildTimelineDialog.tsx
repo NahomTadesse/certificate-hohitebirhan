@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateInput from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -147,7 +148,7 @@ export default function ChildTimelineDialog({
               </div>
               <div>
                 <Label>{t("Date")}</Label>
-                <Input type="date" value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })} />
+                <DateInput value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })} />
               </div>
               <div>
                 <Label>{t("Time")}</Label>

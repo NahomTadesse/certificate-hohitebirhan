@@ -18,6 +18,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/DataTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateInput from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -437,16 +438,14 @@ export default function BaptismCertificatesManagement() {
               </div>
               <div>
                 <Label>{t("Date of Birth")}</Label>
-                <Input
-                  type="date"
+                <DateInput
                   value={formState.dateOfBirth}
                   onChange={(e) => setFormState({ ...formState, dateOfBirth: e.target.value })}
                 />
               </div>
               <div>
                 <Label>{t("Date of Baptism")} *</Label>
-                <Input
-                  type="date"
+                <DateInput
                   value={formState.dateOfBaptism}
                   onChange={(e) => setFormState({ ...formState, dateOfBaptism: e.target.value })}
                 />

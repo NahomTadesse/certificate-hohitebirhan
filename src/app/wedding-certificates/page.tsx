@@ -18,6 +18,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/DataTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateInput from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -501,8 +502,7 @@ export default function WeddingCertificatesManagement() {
               </div>
               <div>
                 <Label>{t("Date of Marriage")} *</Label>
-                <Input
-                  type="date"
+                <DateInput
                   value={formState.dateOfMarriage}
                   onChange={(e) => setFormState({ ...formState, dateOfMarriage: e.target.value })}
                 />

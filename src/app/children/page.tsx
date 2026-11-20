@@ -56,6 +56,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/DataTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateInput from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -91,6 +92,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 import DashboardLayout from "../dashboard/layout";
+import { formatDate } from "@/utils/ethiopianDate";
 import {
   fetchChildrenPage,
   createChild,
@@ -138,6 +140,7 @@ export default function ChildrenManagement() {
   const [transferHistory, setTransferHistory] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
+  const [editingChildId, setEditingChildId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isIdCardDialogOpen, setIsIdCardDialogOpen] = useState(false);
   const [isTimelineOpen, setIsTimelineOpen] = useState(false);
@@ -422,7 +425,7 @@ export default function ChildrenManagement() {
         <div className="flex items-center gap-2">
           <Calendar className="h-3 w-3 text-muted-foreground" />
           <span className="text-sm">
-            {row.original.dateOfBirth ? new Date(row.original.dateOfBirth).toLocaleDateString() : '-'}
+            {row.original.dateOfBirth ? formatDate(row.original.dateOfBirth) : '-'}
           </span>
         </div>
       ),
@@ -471,6 +474,9 @@ export default function ChildrenManagement() {
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => handleViewDetails(row.original)}>
               <Eye className="h-4 w-4 mr-2" /> {t("View Details")}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleEdit(row.original)}>
+              <Edit className="h-4 w-4 mr-2" /> {t("Edit")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {
@@ -527,6 +533,7 @@ export default function ChildrenManagement() {
   ];
 
   const handleAdd = () => {
+    setEditingChildId(null);
     setFormState({
       namePrefixId: "",
       firstName: "",
@@ -544,6 +551,35 @@ export default function ChildrenManagement() {
       dateOfBirth: "",
       gender: "",
       fatherId: "",
+    });
+    setProfileImageFile(null);
+    setProfileImagePreview(null);
+    setActiveChildTab("personal");
+    setFormErrors({});
+    setIsDialogOpen(true);
+  };
+
+  // Open the form pre-filled with an existing child (PUT /api/children/{id})
+  const handleEdit = (c: Child) => {
+    const a: any = c;
+    setEditingChildId(c.id);
+    setFormState({
+      namePrefixId: c.namePrefixId || "",
+      firstName: c.firstName || "",
+      middleName: c.middleName || "",
+      lastName: c.lastName || "",
+      christianName: a.christianName || "",
+      firstNameEn: c.firstNameEn || "",
+      middleNameEn: c.middleNameEn || "",
+      lastNameEn: c.lastNameEn || "",
+      placeOfBirth: a.placeOfBirth || "",
+      nationality: a.nationality || "",
+      motherName: a.motherName || "",
+      email: "",
+      phoneNumber: c.phoneNumber || "",
+      dateOfBirth: c.dateOfBirth ? String(c.dateOfBirth).slice(0, 10) : "",
+      gender: c.gender || "",
+      fatherId: c.fatherId || "",
     });
     setProfileImageFile(null);
     setProfileImagePreview(null);
@@ -588,11 +624,21 @@ export default function ChildrenManagement() {
     setIsSubmitting(true);
 
     try {
-      await createChild(
-        { ...formState, namePrefixId: formState.namePrefixId || undefined },
-        profileImageFile
-      );
-      toast.success(t("Child registered successfully!"));
+      if (editingChildId) {
+        await updateChild(
+          editingChildId,
+          { ...formState, namePrefixId: formState.namePrefixId || undefined },
+          profileImageFile
+        );
+        toast.success(t("Child updated successfully!"));
+      } else {
+        await createChild(
+          { ...formState, namePrefixId: formState.namePrefixId || undefined },
+          profileImageFile
+        );
+        toast.success(t("Child registered successfully!"));
+      }
+      setEditingChildId(null);
       await loadData();
       setIsDialogOpen(false);
       setFormErrors({});
@@ -755,7 +801,7 @@ export default function ChildrenManagement() {
                       <div>
                         <Label className="text-muted-foreground">{t("Date of Birth")}</Label>
                         <p className="font-semibold">
-                          {selectedChild.dateOfBirth ? new Date(selectedChild.dateOfBirth).toLocaleDateString() : "-"}
+                          {selectedChild.dateOfBirth ? formatDate(selectedChild.dateOfBirth) : "-"}
                         </p>
                       </div>
                       <div>
@@ -940,7 +986,7 @@ export default function ChildrenManagement() {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-2xl">{t("Register New Child")}</DialogTitle>
+              <DialogTitle className="text-2xl">{editingChildId ? t("Edit Child") : t("Register New Child")}</DialogTitle>
             </DialogHeader>
             <Tabs value={activeChildTab} onValueChange={setActiveChildTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
@@ -992,8 +1038,7 @@ export default function ChildrenManagement() {
                   </div>
                   <div className="space-y-1.5">
                     <Label>{t("Date of Birth")} *</Label>
-                    <Input
-                      type="date"
+                    <DateInput
                       value={formState.dateOfBirth}
                       onChange={(e) => {
                         setFormState({ ...formState, dateOfBirth: e.target.value });
@@ -1197,7 +1242,7 @@ export default function ChildrenManagement() {
                 </Button>
               ) : (
                 <Button onClick={handleSubmit} disabled={isSubmitting}>
-                  {isSubmitting ? t("Saving...") : t("Register")}
+                  {isSubmitting ? t("Saving...") : editingChildId ? t("Save Changes") : t("Register")}
                 </Button>
               )}
             </DialogFooter>
@@ -1447,7 +1492,7 @@ export default function ChildrenManagement() {
                         <p>
                           <span className="font-semibold">{t("Date of Birth")}: </span>
                           {idCardChild.dateOfBirth
-                            ? new Date(idCardChild.dateOfBirth).toLocaleDateString()
+                            ? formatDate(idCardChild.dateOfBirth)
                             : "-"}
                         </p>
                         <p>

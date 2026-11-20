@@ -1340,5 +1340,10 @@
   "Fee Note": "የክፍያ ማስታወሻ",
   "Create anyway": "ለማንኛውም ፍጠር",
   "Please fill in all required fields (*)": "እባክዎ ሁሉንም አስፈላጊ መስኮች (*) ይሙሉ",
-  "Manual certificate generated successfully!": "የምስክር ወረቀቱ በተሳካ ሁኔታ ተዘጋጅቷል!"
+  "Manual certificate generated successfully!": "የምስክር ወረቀቱ በተሳካ ሁኔታ ተዘጋጅቷል!",
+  "Edit Father": "አባትን አርም",
+  "Edit Child": "ልጅን አርም",
+  "Save Changes": "ለውጦችን አስቀምጥ",
+  "Father updated successfully!": "አባት በተሳካ ሁኔታ ተሻሽሏል!",
+  "Child updated successfully!": "ልጅ በተሳካ ሁኔታ ተሻሽሏል!"
 }

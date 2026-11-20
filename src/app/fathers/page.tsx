@@ -777,11 +777,11 @@
 //                                 </div>
 //                                 <div>
 //                                   <Label className="text-muted-foreground">{t("Kinet Date")}</Label>
-//                                   <p className="font-semibold">{info.kinetDate ? new Date(info.kinetDate).toLocaleDateString() : "-"}</p>
+//                                   <p className="font-semibold">{info.kinetDate ? formatDate(info.kinetDate) : "-"}</p>
 //                                 </div>
 //                                 <div>
 //                                   <Label className="text-muted-foreground">{t("Current Church Start Date")}</Label>
-//                                   <p className="font-semibold">{info.currentChurchStartDate ? new Date(info.currentChurchStartDate).toLocaleDateString() : "-"}</p>
+//                                   <p className="font-semibold">{info.currentChurchStartDate ? formatDate(info.currentChurchStartDate) : "-"}</p>
 //                                 </div>
 //                                 <div>
 //                                   <Label className="text-muted-foreground">{t("Role")}</Label>
@@ -789,11 +789,11 @@
 //                                 </div>
 //                                 <div>
 //                                   <Label className="text-muted-foreground">{t("Start Date")}</Label>
-//                                   <p className="font-semibold">{info.startDate ? new Date(info.startDate).toLocaleDateString() : "-"}</p>
+//                                   <p className="font-semibold">{info.startDate ? formatDate(info.startDate) : "-"}</p>
 //                                 </div>
 //                                 <div>
 //                                   <Label className="text-muted-foreground">{t("End Date")}</Label>
-//                                   <p className="font-semibold">{info.endDate ? new Date(info.endDate).toLocaleDateString() : "-"}</p>
+//                                   <p className="font-semibold">{info.endDate ? formatDate(info.endDate) : "-"}</p>
 //                                 </div>
 //                                 <div>
 //                                   <Label className="text-muted-foreground">{t("Number of Children")}</Label>
@@ -834,8 +834,8 @@
 //                             {selectedFather.serviceHistory.map((service, idx) => (
 //                               <TableRow key={idx}>
 //                                 <TableCell className="font-medium">{service.churchName || "-"}</TableCell>
-//                                 <TableCell>{service.startDate ? new Date(service.startDate).toLocaleDateString() : "-"}</TableCell>
-//                                 <TableCell>{service.endDate ? new Date(service.endDate).toLocaleDateString() : "-"}</TableCell>
+//                                 <TableCell>{service.startDate ? formatDate(service.startDate) : "-"}</TableCell>
+//                                 <TableCell>{service.endDate ? formatDate(service.endDate) : "-"}</TableCell>
 //                               </TableRow>
 //                             ))}
 //                           </TableBody>
@@ -873,8 +873,8 @@
 //                               <TableRow key={idx}>
 //                                 <TableCell className="font-medium">{edu.institutionName || "-"}</TableCell>
 //                                 <TableCell>{edu.fieldOfStudy || "-"}</TableCell>
-//                                 <TableCell>{edu.startDate ? new Date(edu.startDate).toLocaleDateString() : "-"}</TableCell>
-//                                 <TableCell>{edu.endDate ? new Date(edu.endDate).toLocaleDateString() : "-"}</TableCell>
+//                                 <TableCell>{edu.startDate ? formatDate(edu.startDate) : "-"}</TableCell>
+//                                 <TableCell>{edu.endDate ? formatDate(edu.endDate) : "-"}</TableCell>
 //                               </TableRow>
 //                             ))}
 //                           </TableBody>
@@ -1415,6 +1415,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/DataTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateInput from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -1459,9 +1460,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import DashboardLayout from "../dashboard/layout";
+import { formatDate } from "@/utils/ethiopianDate";
 import {
   fetchFathers,
   createFather,
+  updateFather,
   deleteFather,
   transferFather,
   deactivateFather,
@@ -1523,6 +1526,7 @@ export default function FatherManagement() {
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   const [isDeactivateDialogOpen, setIsDeactivateDialogOpen] = useState(false);
   const [selectedFather, setSelectedFather] = useState<Father | null>(null);
+  const [editingFatherId, setEditingFatherId] = useState<string | null>(null);
   const [transferChurchId, setTransferChurchId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
@@ -1841,6 +1845,9 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
             >
               <Eye className="h-4 w-4 mr-2" /> {t("View Details")}
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleEdit(row.original)}>
+              <Edit className="h-4 w-4 mr-2" /> {t("Edit")}
+            </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {
                 setSelectedFather(row.original);
@@ -1895,6 +1902,7 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
   };
 
   const handleAdd = () => {
+    setEditingFatherId(null);
     setFormState({
       namePrefixId: "",
       firstName: "",
@@ -1916,6 +1924,50 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
       spiritualInfo: [defaultSpiritualInfo],
       serviceHistory: [defaultServiceHistory],
       educationList: [defaultEducation],
+    });
+    setActiveTab("basic");
+    setRegistrationDocuments([]);
+    handleProfilePhotoChange(null);
+    setIsDialogOpen(true);
+  };
+
+  // Open the form pre-filled with an existing father (PUT /api/fathers/{id})
+  const handleEdit = (f: Father) => {
+    const a: any = f;
+    const norm = (v?: string) => (v || "").trim().toLowerCase();
+    const churchId =
+      a.churchId || churches.find((c) => norm(c.name) === norm(a.churchName))?.id || "";
+    const dioceseId =
+      a.dioceseId || dioceses.find((d) => norm(d.name) === norm(a.dioceseName))?.id || "";
+    const prefixId =
+      a.namePrefixId ||
+      prefixOptions.find(
+        (p) => norm(p.label) === norm(a.namePrefixLabel) || norm(p.amharicLabel) === norm(a.namePrefixLabel)
+      )?.id ||
+      "";
+    const ord: any = a.ordination && typeof a.ordination === "object" ? a.ordination : {};
+    setEditingFatherId(f.id);
+    setFormState({
+      namePrefixId: prefixId,
+      firstName: f.firstName || "",
+      middleName: f.middleName || "",
+      lastName: f.lastName || "",
+      christianName: a.christianName || "",
+      motherName: a.motherName || "",
+      phoneNumber: f.phoneNumber || "",
+      churchId,
+      dioceseId,
+      clericalRank: a.clericalRank || "PRIEST",
+      monasticismType: a.monasticismType || "SECULAR",
+      monasticName: a.monasticName || "",
+      placeOfBirth: a.placeOfBirth || "",
+      nationality: a.nationality || "",
+      ordinationDate: ord.ordinationDate || "",
+      bishopName: ord.bishopName || "",
+      ordinationPlace: ord.ordinationPlace || "",
+      spiritualInfo: f.spiritualInfo && f.spiritualInfo.length ? f.spiritualInfo.map((x) => ({ ...defaultSpiritualInfo, ...x })) : [defaultSpiritualInfo],
+      serviceHistory: f.serviceHistory && f.serviceHistory.length ? f.serviceHistory.map((x) => ({ ...defaultServiceHistory, ...x })) : [defaultServiceHistory],
+      educationList: f.educationList && f.educationList.length ? f.educationList.map((x) => ({ ...defaultEducation, ...x })) : [defaultEducation],
     });
     setActiveTab("basic");
     setRegistrationDocuments([]);
@@ -2058,8 +2110,14 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
         files.push(d);
         types.push("REGISTRATION");
       });
-      await createFather(payload, files, files.length ? types : undefined);
-      toast.success("Father registered successfully!");
+      if (editingFatherId) {
+        await updateFather(editingFatherId, payload as any, files, files.length ? types : undefined);
+        toast.success(t("Father updated successfully!"));
+      } else {
+        await createFather(payload, files, files.length ? types : undefined);
+        toast.success("Father registered successfully!");
+      }
+      setEditingFatherId(null);
       await loadData();
       setIsDialogOpen(false);
       setRegistrationDocuments([]);
@@ -2286,7 +2344,7 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
                           <p className="font-semibold">
                             {[
                               selectedFather.ordination.ordinationDate
-                                ? new Date(selectedFather.ordination.ordinationDate).toLocaleDateString()
+                                ? formatDate(selectedFather.ordination.ordinationDate)
                                 : "",
                               selectedFather.ordination.bishopName,
                               selectedFather.ordination.ordinationPlace,
@@ -2332,11 +2390,11 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
                                 </div>
                                 <div>
                                   <Label className="text-muted-foreground">{t("Kinet Date")}</Label>
-                                  <p className="font-semibold">{info.kinetDate ? new Date(info.kinetDate).toLocaleDateString() : "-"}</p>
+                                  <p className="font-semibold">{info.kinetDate ? formatDate(info.kinetDate) : "-"}</p>
                                 </div>
                                 <div>
                                   <Label className="text-muted-foreground">{t("Current Church Start Date")}</Label>
-                                  <p className="font-semibold">{info.currentChurchStartDate ? new Date(info.currentChurchStartDate).toLocaleDateString() : "-"}</p>
+                                  <p className="font-semibold">{info.currentChurchStartDate ? formatDate(info.currentChurchStartDate) : "-"}</p>
                                 </div>
                                 <div>
                                   <Label className="text-muted-foreground">{t("Role")}</Label>
@@ -2344,11 +2402,11 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
                                 </div>
                                 <div>
                                   <Label className="text-muted-foreground">{t("Start Date")}</Label>
-                                  <p className="font-semibold">{info.startDate ? new Date(info.startDate).toLocaleDateString() : "-"}</p>
+                                  <p className="font-semibold">{info.startDate ? formatDate(info.startDate) : "-"}</p>
                                 </div>
                                 <div>
                                   <Label className="text-muted-foreground">{t("End Date")}</Label>
-                                  <p className="font-semibold">{info.endDate ? new Date(info.endDate).toLocaleDateString() : "-"}</p>
+                                  <p className="font-semibold">{info.endDate ? formatDate(info.endDate) : "-"}</p>
                                 </div>
                                 <div>
                                   <Label className="text-muted-foreground">{t("Number of Children")}</Label>
@@ -2389,8 +2447,8 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
                             {selectedFather.serviceHistory.map((service, idx) => (
                               <TableRow key={idx}>
                                 <TableCell className="font-medium">{service.churchName || "-"}</TableCell>
-                                <TableCell>{service.startDate ? new Date(service.startDate).toLocaleDateString() : "-"}</TableCell>
-                                <TableCell>{service.endDate ? new Date(service.endDate).toLocaleDateString() : "-"}</TableCell>
+                                <TableCell>{service.startDate ? formatDate(service.startDate) : "-"}</TableCell>
+                                <TableCell>{service.endDate ? formatDate(service.endDate) : "-"}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -2428,8 +2486,8 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
                               <TableRow key={idx}>
                                 <TableCell className="font-medium">{edu.institutionName || "-"}</TableCell>
                                 <TableCell>{edu.fieldOfStudy || "-"}</TableCell>
-                                <TableCell>{edu.startDate ? new Date(edu.startDate).toLocaleDateString() : "-"}</TableCell>
-                                <TableCell>{edu.endDate ? new Date(edu.endDate).toLocaleDateString() : "-"}</TableCell>
+                                <TableCell>{edu.startDate ? formatDate(edu.startDate) : "-"}</TableCell>
+                                <TableCell>{edu.endDate ? formatDate(edu.endDate) : "-"}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -2540,7 +2598,7 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-2xl">{t("Register New Father")}</DialogTitle>
+              <DialogTitle className="text-2xl">{editingFatherId ? t("Edit Father") : t("Register New Father")}</DialogTitle>
             </DialogHeader>
             
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -2722,7 +2780,7 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label>{t("Ordination Date")}</Label>
-                    <Input type="date" value={formState.ordinationDate} onChange={(e) => setFormState({ ...formState, ordinationDate: e.target.value })} />
+                    <DateInput value={formState.ordinationDate} onChange={(e) => setFormState({ ...formState, ordinationDate: e.target.value })} />
                   </div>
                   <div className="space-y-1.5">
                     <Label>{t("Ordaining Bishop")}</Label>
@@ -2766,16 +2824,14 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
                       </div>
                       <div>
                         <Label>Kinet Date</Label>
-                        <Input
-                          type="date"
+                        <DateInput
                           value={info.kinetDate}
                           onChange={(e) => updateSpiritualInfo(index, "kinetDate", e.target.value)}
                         />
                       </div>
                       <div>
                         <Label>Current Church Start Date</Label>
-                        <Input
-                          type="date"
+                        <DateInput
                           value={info.currentChurchStartDate}
                           onChange={(e) => updateSpiritualInfo(index, "currentChurchStartDate", e.target.value)}
                         />
@@ -2789,16 +2845,14 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
                       </div>
                       <div>
                         <Label>Start Date</Label>
-                        <Input
-                          type="date"
+                        <DateInput
                           value={info.startDate}
                           onChange={(e) => updateSpiritualInfo(index, "startDate", e.target.value)}
                         />
                       </div>
                       <div>
                         <Label>End Date</Label>
-                        <Input
-                          type="date"
+                        <DateInput
                           value={info.endDate}
                           onChange={(e) => updateSpiritualInfo(index, "endDate", e.target.value)}
                         />
@@ -2840,16 +2894,14 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <Label>Start Date</Label>
-                        <Input
-                          type="date"
+                        <DateInput
                           value={service.startDate}
                           onChange={(e) => updateServiceHistory(index, "startDate", e.target.value)}
                         />
                       </div>
                       <div>
                         <Label>End Date</Label>
-                        <Input
-                          type="date"
+                        <DateInput
                           value={service.endDate}
                           onChange={(e) => updateServiceHistory(index, "endDate", e.target.value)}
                         />
@@ -2900,16 +2952,14 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <Label>Start Date</Label>
-                        <Input
-                          type="date"
+                        <DateInput
                           value={edu.startDate}
                           onChange={(e) => updateEducation(index, "startDate", e.target.value)}
                         />
                       </div>
                       <div>
                         <Label>End Date</Label>
-                        <Input
-                          type="date"
+                        <DateInput
                           value={edu.endDate}
                           onChange={(e) => updateEducation(index, "endDate", e.target.value)}
                         />
@@ -2943,7 +2993,7 @@ const loadData = useCallback(async (search?: string, pageArg?: number) => {
                 }
                 return (
                   <Button onClick={handleSubmit} disabled={isSubmitting}>
-                    {isSubmitting ? t("Saving...") : t("Register")}
+                    {isSubmitting ? t("Saving...") : editingFatherId ? t("Save Changes") : t("Register")}
                   </Button>
                 );
               })()}

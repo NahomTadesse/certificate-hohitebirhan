@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateInput from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -115,11 +116,15 @@ export default function ManualCertificateDialog({
       <Label>
         {t(label)} {required && "*"}
       </Label>
-      <Input
-        type={type}
-        value={(form[key] as string) || ""}
-        onChange={(e) => set(key, e.target.value as any)}
-      />
+      {type === "date" ? (
+        <DateInput value={(form[key] as string) || ""} onChange={(e) => set(key, e.target.value as any)} />
+      ) : (
+        <Input
+          type={type}
+          value={(form[key] as string) || ""}
+          onChange={(e) => set(key, e.target.value as any)}
+        />
+      )}
     </div>
   );
 

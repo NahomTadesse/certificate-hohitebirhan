@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import DashboardLayout from "../dashboard/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateInput from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -501,7 +502,7 @@ export default function ResourcesPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div><Label>{t("Acquisition Date")}</Label><Input type="date" value={form.acquisitionDate} onChange={(e) => set({ acquisitionDate: e.target.value })} /></div>
+              <div><Label>{t("Acquisition Date")}</Label><DateInput value={form.acquisitionDate} onChange={(e) => set({ acquisitionDate: e.target.value })} /></div>
               <div><Label>{t("Donor Name")}</Label><Input value={form.donorName} onChange={(e) => set({ donorName: e.target.value })} /></div>
               <div><Label>{t("Estimated Value")}</Label><Input type="number" min={0} value={form.estimatedValue} onChange={(e) => set({ estimatedValue: e.target.value })} /></div>
               <div><Label>{t("Year of Origin")}</Label><Input type="number" value={form.yearOfOrigin} onChange={(e) => set({ yearOfOrigin: e.target.value })} /></div>
@@ -545,10 +546,10 @@ export default function ResourcesPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div><Label>{t("Assigned Date")} *</Label><Input type="date" value={assign.assignedDate} onChange={(e) => setAssign({ ...assign, assignedDate: e.target.value })} /></div>
+                <div><Label>{t("Assigned Date")} *</Label><DateInput value={assign.assignedDate} onChange={(e) => setAssign({ ...assign, assignedDate: e.target.value })} /></div>
               </div>
               {assign.assignmentType === "BORROWED" && (
-                <div><Label>{t("Expected Return Date")} *</Label><Input type="date" value={assign.expectedReturnDate} onChange={(e) => setAssign({ ...assign, expectedReturnDate: e.target.value })} /></div>
+                <div><Label>{t("Expected Return Date")} *</Label><DateInput value={assign.expectedReturnDate} onChange={(e) => setAssign({ ...assign, expectedReturnDate: e.target.value })} /></div>
               )}
               <div><Label>{t("Notes")}</Label><Textarea rows={2} value={assign.notes} onChange={(e) => setAssign({ ...assign, notes: e.target.value })} /></div>
             </div>

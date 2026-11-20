@@ -21,6 +21,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/DataTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateInput from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -410,8 +411,7 @@ export default function DeathRecordsManagement() {
 
               <div>
                 <Label>{t("Date of Death")} *</Label>
-                <Input
-                  type="date"
+                <DateInput
                   value={formState.dateOfDeath}
                   onChange={(e) => setFormState({ ...formState, dateOfDeath: e.target.value })}
                 />

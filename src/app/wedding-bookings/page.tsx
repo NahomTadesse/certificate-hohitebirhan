@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import DashboardLayout from "../dashboard/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateInput from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -251,8 +252,8 @@ export default function WeddingBookingsPage() {
                 <SelectContent>{churches.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div><Label>{t("From")}</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-            <div><Label>{t("To")}</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+            <div><Label>{t("From")}</Label><DateInput value={from} onChange={(e) => setFrom(e.target.value)} /></div>
+            <div><Label>{t("To")}</Label><DateInput value={to} onChange={(e) => setTo(e.target.value)} /></div>
             <Button variant="outline" onClick={load} disabled={loading}><RefreshCw className="h-4 w-4 mr-2" />{t("Refresh")}</Button>
           </CardContent>
         </Card>
@@ -340,7 +341,7 @@ export default function WeddingBookingsPage() {
                   options={children.map((c) => ({ value: c.id, label: c.fullName }))} placeholder={t("Select the bride")} searchPlaceholder={t("Search children...")} />
                 <Input className="mt-2" placeholder={t("or type the bride's full name")} value={form.brideFullName} onChange={(e) => setForm({ ...form, brideFullName: e.target.value, brideChildId: "" })} />
               </div>
-              <div><Label>{t("Date")} *</Label><Input type="date" value={form.bookingDate} onChange={(e) => { setForm({ ...form, bookingDate: e.target.value }); setAvailability(null); }} /></div>
+              <div><Label>{t("Date")} *</Label><DateInput value={form.bookingDate} onChange={(e) => { setForm({ ...form, bookingDate: e.target.value }); setAvailability(null); }} /></div>
               <div><Label>{t("Time")} *</Label><Input type="time" value={form.bookingTime} onChange={(e) => { setForm({ ...form, bookingTime: e.target.value }); setAvailability(null); }} /></div>
               <div className="sm:col-span-2 flex items-center gap-3">
                 <Button type="button" variant="outline" size="sm" onClick={checkAvailability}>{t("Check availability")}</Button>

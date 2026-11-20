@@ -6,6 +6,7 @@ import { FileBarChart } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateInput from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -79,11 +80,11 @@ export default function PaymentReportsPage() {
               </div>
               <div>
                 <Label>{t("Start Date")}</Label>
-                <Input type="date" value={reportStart} onChange={(e) => setReportStart(e.target.value)} />
+                <DateInput value={reportStart} onChange={(e) => setReportStart(e.target.value)} />
               </div>
               <div>
                 <Label>{t("End Date")}</Label>
-                <Input type="date" value={reportEnd} onChange={(e) => setReportEnd(e.target.value)} />
+                <DateInput value={reportEnd} onChange={(e) => setReportEnd(e.target.value)} />
               </div>
               <div className="flex items-end">
                 <Button className="w-full" onClick={handleLoadReport} disabled={loadingReport}>

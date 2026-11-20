@@ -440,6 +440,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateInput from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -661,8 +662,7 @@ export default function FamilyManagement() {
               </div>
               <div>
                 <Label>{t("Date of Birth")}</Label>
-                <Input
-                  type="date"
+                <DateInput
                   value={memberForm.dateOfBirth}
                   onChange={(e) => setMemberForm({ ...memberForm, dateOfBirth: e.target.value })}
                 />
@@ -782,8 +782,7 @@ export default function FamilyManagement() {
               </div>
               <div>
                 <Label>{t("Marriage Date")}</Label>
-                <Input
-                  type="date"
+                <DateInput
                   value={marriageForm.marriageDate}
                   onChange={(e) => setMarriageForm({ ...marriageForm, marriageDate: e.target.value })}
                 />

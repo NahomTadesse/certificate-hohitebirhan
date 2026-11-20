@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 
 import DashboardLayout from "../dashboard/layout";
+import { formatDate } from "@/utils/ethiopianDate";
 import {
   fetchAllUsersPaginated,
   updateUser,
@@ -173,7 +174,7 @@ export default function UsersManagement() {
       header: t("Created"),
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground">
-          {row.original.createdDate ? new Date(row.original.createdDate).toLocaleDateString() : "-"}
+          {row.original.createdDate ? formatDate(row.original.createdDate) : "-"}
         </span>
       ),
     },

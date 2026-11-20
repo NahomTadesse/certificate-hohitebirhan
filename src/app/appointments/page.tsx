@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import DashboardLayout from "../dashboard/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateInput from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -257,7 +258,7 @@ export default function AppointmentsPage() {
                   placeholder={t("Select a child")} searchPlaceholder={t("Search children...")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><Label>{t("Date")} *</Label><Input type="date" value={req.requestedDate} onChange={(e) => setReq({ ...req, requestedDate: e.target.value })} /></div>
+                <div><Label>{t("Date")} *</Label><DateInput value={req.requestedDate} onChange={(e) => setReq({ ...req, requestedDate: e.target.value })} /></div>
                 <div><Label>{t("Time")} *</Label><Input type="time" value={req.requestedTime} onChange={(e) => setReq({ ...req, requestedTime: e.target.value })} /></div>
               </div>
               <PhoneInput className="space-y-1.5 [&>label]:mb-0" label={t("Contact Phone")} value={req.contactPhone} onChange={(v) => setReq({ ...req, contactPhone: v })} />
@@ -284,7 +285,7 @@ export default function AppointmentsPage() {
               {dlg?.kind === "propose" && (
                 <>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><Label>{t("New Date")} *</Label><Input type="date" value={dlgVals.newDate} onChange={(e) => setDlgVals({ ...dlgVals, newDate: e.target.value })} /></div>
+                    <div><Label>{t("New Date")} *</Label><DateInput value={dlgVals.newDate} onChange={(e) => setDlgVals({ ...dlgVals, newDate: e.target.value })} /></div>
                     <div><Label>{t("New Time")} *</Label><Input type="time" value={dlgVals.newTime} onChange={(e) => setDlgVals({ ...dlgVals, newTime: e.target.value })} /></div>
                   </div>
                   <div><Label>{t("Note")}</Label><Textarea rows={2} value={dlgVals.note} onChange={(e) => setDlgVals({ ...dlgVals, note: e.target.value })} /></div>

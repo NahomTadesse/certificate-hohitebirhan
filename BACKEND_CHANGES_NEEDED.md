@@ -145,3 +145,10 @@ current Swagger spec (`certificate-api.hohitebirhan.com`), so the backend needs 
 ---
 None of the above are blockers for the rest of the frontend work — everything else in this
 pass only touches endpoints/fields that already exist in your Swagger.
+
+## Edit + Ethiopian calendar update
+- Children and Fathers now have **Edit** (PUT /api/children/{id}, PUT /api/fathers/{id}). The father response has no
+  `churchId` / `dioceseId` / `namePrefixId`, so the edit form matches them from `churchName` / `dioceseName` /
+  `namePrefixLabel`. Please add those ids to `FatherResponseDTO` (and `namePrefixId` etc.) for a reliable pre-fill.
+- Date pickers use the Ethiopian calendar for Amharic/Tigrinya/Oromo (`src/utils/ethiopianDate.ts`); the API still
+  receives Gregorian `yyyy-MM-dd`.

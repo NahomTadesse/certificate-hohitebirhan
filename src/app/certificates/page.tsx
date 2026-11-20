@@ -19,6 +19,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateInput from "@/components/DateInput";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -428,7 +429,7 @@ function CertificatesPageWr() {
               <Label>
                 {type === "BAPTISM" ? t("Date of Baptism") : type === "WEDDING" ? t("Date of Marriage") : t("Date of Death")} *
               </Label>
-              <Input type="date" value={dateOfEvent} onChange={(e) => setDateOfEvent(e.target.value)} />
+              <DateInput value={dateOfEvent} onChange={(e) => setDateOfEvent(e.target.value)} />
             </div>
 
             {type !== "DEATH" && (
