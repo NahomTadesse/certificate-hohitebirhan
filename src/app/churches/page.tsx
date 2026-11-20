@@ -21,7 +21,6 @@ import {
   Church as ch,
   Globe,
   Home,
-  Map,
   Navigation,
   House,
 } from "lucide-react";
@@ -32,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
@@ -79,6 +79,8 @@ export default function ChurchManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(0);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [viewLoading, setViewLoading] = useState(false);
   const [selectedChurch, setSelectedChurch] = useState<Church | null>(null);
@@ -162,22 +164,6 @@ export default function ChurchManagement() {
     );
   }, [churches, searchQuery]);
 
-  // Open a dialog only after the dropdown menu has fully closed. Opening both at once can leave
-  // the page with pointer-events disabled (the "stuck page").
-  const afterMenuClose = (fn: () => void) => {
-    setTimeout(fn, 80);
-  };
-
-  // Safety net: if every dialog is closed, make sure the body is clickable again.
-  useEffect(() => {
-    if (isDialogOpen || isViewDialogOpen || isDeleteDialogOpen) return;
-    const t = setTimeout(() => {
-      if (document.body.style.pointerEvents === "none") document.body.style.pointerEvents = "";
-      document.body.removeAttribute("data-scroll-locked");
-    }, 300);
-    return () => clearTimeout(t);
-  }, [isDialogOpen, isViewDialogOpen, isDeleteDialogOpen]);
-
   const isChurchActive = (c: Church) => ((c as any).isActive ?? (c as any).active) !== false;
 
   // Merge API address (may contain nulls) over the defaults so inputs stay controlled
@@ -203,6 +189,17 @@ export default function ChurchManagement() {
       setViewLoading(false);
     }
   };
+
+  const totalPages = Math.max(1, Math.ceil(filteredChurches.length / PAGE_SIZE));
+  const pagedChurches = filteredChurches.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  // go back to the first page when searching, and keep the page valid when the list shrinks
+  useEffect(() => {
+    setPage(0);
+  }, [searchQuery]);
+  useEffect(() => {
+    if (page > totalPages - 1) setPage(Math.max(0, totalPages - 1));
+  }, [page, totalPages]);
 
   const columns: ColumnDef<Church>[] = [
     {
@@ -275,28 +272,26 @@ export default function ChurchManagement() {
     {
       id: "actions",
       cell: ({ row }) => (
-        <DropdownMenu modal={false}>
+        <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="ghost">
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => afterMenuClose(() => handleView(row.original))}>
+            <DropdownMenuItem onClick={() => handleView(row.original)}>
               <Eye className="h-4 w-4 mr-2" /> {t("View Details")}
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => afterMenuClose(() => handleEdit(row.original))}>
+            <DropdownMenuItem onClick={() => handleEdit(row.original)}>
               <Edit className="h-4 w-4 mr-2" /> {t("Edit")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-red-600 focus:text-red-600"
-              onSelect={() =>
-                afterMenuClose(() => {
-                  setSelectedChurch(row.original);
-                  setIsDeleteDialogOpen(true);
-                })
-              }
+              onClick={() => {
+                setSelectedChurch(row.original);
+                setIsDeleteDialogOpen(true);
+              }}
             >
               <Trash2 className="h-4 w-4 mr-2" /> {t("Delete")}
             </DropdownMenuItem>
@@ -425,7 +420,18 @@ export default function ChurchManagement() {
             <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <DataTable columns={columns} data={filteredChurches} clientPageSize={10} />
+          <DataTable
+            columns={columns}
+            data={pagedChurches}
+            pagination={{
+              page,
+              totalPages,
+              totalElements: filteredChurches.length,
+              pageSize: PAGE_SIZE,
+              onPageChange: setPage,
+              loading,
+            }}
+          />
         )}
 
         {/* Add/Edit Dialog */}
@@ -585,71 +591,86 @@ export default function ChurchManagement() {
 
         {/* View Details Dialog */}
         <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-2xl flex items-center gap-2">
-                <House className="h-6 w-6 text-primary" /> {selectedChurch?.name}
+              <DialogTitle className="flex items-center gap-2 text-2xl">
+                <House className="h-6 w-6 text-primary" />
+                {t("Church Details")}
               </DialogTitle>
             </DialogHeader>
+
             {selectedChurch && (
-              <div className="space-y-5 py-2">
-                {viewLoading && <p className="text-xs text-muted-foreground">{t("Loading...")}</p>}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{t("Diocese")}</p>
-                    <p className="font-semibold">{selectedChurch.diocese || "-"}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">{t("Status")}</p>
-                    <Badge className={isChurchActive(selectedChurch) ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                      {isChurchActive(selectedChurch) ? t("ACTIVE") : t("INACTIVE")}
-                    </Badge>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-2 flex items-center gap-2">
-                    <MapPin className="h-4 w-4" /> {t("Address Details")}
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    {([
-                      ["Country", "country"],
-                      ["Region", "region"],
-                      ["Zone", "zone"],
-                      ["City", "city"],
-                      ["Subcity", "subcity"],
-                      ["District", "district"],
-                      ["Woreda", "woreda"],
-                      ["Kebele", "kebele"],
-                      ["House Number", "houseNumber"],
-                      ["Street", "street"],
-                    ] as [string, keyof Address][]).map(([label, key]) => (
-                      <div key={key}>
-                        <p className="text-sm text-muted-foreground">{t(label)}</p>
-                        <p className="font-semibold">{(selectedChurch.address as any)?.[key] || "-"}</p>
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Globe className="h-5 w-5 text-primary" />
+                      {t("Basic Information")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label className="text-muted-foreground">{t("Church Name")}</Label>
+                        <p className="font-semibold">{selectedChurch.name || "-"}</p>
                       </div>
-                    ))}
-                    {selectedChurch.address?.additionalInfo && (
-                      <div className="col-span-2">
-                        <p className="text-sm text-muted-foreground">{t("Additional Information")}</p>
-                        <p className="font-semibold">{selectedChurch.address.additionalInfo}</p>
+                      <div>
+                        <Label className="text-muted-foreground">{t("Diocese")}</Label>
+                        <p className="font-semibold">{selectedChurch.diocese || "-"}</p>
                       </div>
-                    )}
-                  </div>
-                </div>
+                      <div>
+                        <Label className="text-muted-foreground">{t("Status")}</Label>
+                        <div className="mt-1">
+                          <Badge className={isChurchActive(selectedChurch) ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                            {isChurchActive(selectedChurch) ? t("ACTIVE") : t("INACTIVE")}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-primary" />
+                      {t("Address Details")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {([
+                        ["Country", "country"],
+                        ["Region", "region"],
+                        ["Zone", "zone"],
+                        ["City", "city"],
+                        ["Subcity", "subcity"],
+                        ["District", "district"],
+                        ["Woreda", "woreda"],
+                        ["Kebele", "kebele"],
+                        ["House Number", "houseNumber"],
+                        ["Street", "street"],
+                      ] as [string, keyof Address][]).map(([label, key]) => (
+                        <div key={key}>
+                          <Label className="text-muted-foreground">{t(label)}</Label>
+                          <p className="font-semibold">{(selectedChurch.address as any)?.[key] || "-"}</p>
+                        </div>
+                      ))}
+                      {selectedChurch.address?.additionalInfo && (
+                        <div className="md:col-span-3">
+                          <Label className="text-muted-foreground">{t("Additional Information")}</Label>
+                          <p className="font-semibold">{selectedChurch.address.additionalInfo}</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             )}
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
                 {t("Close")}
-              </Button>
-              <Button
-                onClick={() => {
-                  setIsViewDialogOpen(false);
-                  const c = selectedChurch;
-                  if (c) afterMenuClose(() => handleEdit(c));
-                }}
-              >
-                <Edit className="h-4 w-4 mr-2" /> {t("Edit")}
               </Button>
             </DialogFooter>
           </DialogContent>
