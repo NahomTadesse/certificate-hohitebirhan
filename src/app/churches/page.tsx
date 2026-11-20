@@ -162,6 +162,22 @@ export default function ChurchManagement() {
     );
   }, [churches, searchQuery]);
 
+  // Open a dialog only after the dropdown menu has fully closed. Opening both at once can leave
+  // the page with pointer-events disabled (the "stuck page").
+  const afterMenuClose = (fn: () => void) => {
+    setTimeout(fn, 80);
+  };
+
+  // Safety net: if every dialog is closed, make sure the body is clickable again.
+  useEffect(() => {
+    if (isDialogOpen || isViewDialogOpen || isDeleteDialogOpen) return;
+    const t = setTimeout(() => {
+      if (document.body.style.pointerEvents === "none") document.body.style.pointerEvents = "";
+      document.body.removeAttribute("data-scroll-locked");
+    }, 300);
+    return () => clearTimeout(t);
+  }, [isDialogOpen, isViewDialogOpen, isDeleteDialogOpen]);
+
   const isChurchActive = (c: Church) => ((c as any).isActive ?? (c as any).active) !== false;
 
   // Merge API address (may contain nulls) over the defaults so inputs stay controlled
@@ -259,26 +275,28 @@ export default function ChurchManagement() {
     {
       id: "actions",
       cell: ({ row }) => (
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="ghost">
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleView(row.original)}>
+            <DropdownMenuItem onSelect={() => afterMenuClose(() => handleView(row.original))}>
               <Eye className="h-4 w-4 mr-2" /> {t("View Details")}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleEdit(row.original)}>
+            <DropdownMenuItem onSelect={() => afterMenuClose(() => handleEdit(row.original))}>
               <Edit className="h-4 w-4 mr-2" /> {t("Edit")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-red-600 focus:text-red-600"
-              onClick={() => {
-                setSelectedChurch(row.original);
-                setIsDeleteDialogOpen(true);
-              }}
+              onSelect={() =>
+                afterMenuClose(() => {
+                  setSelectedChurch(row.original);
+                  setIsDeleteDialogOpen(true);
+                })
+              }
             >
               <Trash2 className="h-4 w-4 mr-2" /> {t("Delete")}
             </DropdownMenuItem>
@@ -627,7 +645,8 @@ export default function ChurchManagement() {
               <Button
                 onClick={() => {
                   setIsViewDialogOpen(false);
-                  if (selectedChurch) handleEdit(selectedChurch);
+                  const c = selectedChurch;
+                  if (c) afterMenuClose(() => handleEdit(c));
                 }}
               >
                 <Edit className="h-4 w-4 mr-2" /> {t("Edit")}
