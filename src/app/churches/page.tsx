@@ -6,6 +6,8 @@ import {
   Building,
   Plus,
   Edit,
+  Eye,
+  MoreVertical,
   Trash2,
   Search,
   RefreshCw,
@@ -45,6 +47,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -54,10 +63,10 @@ import {
   createChurch,
   updateChurch,
   deactivateChurch,
+  fetchChurchById,
   Church,
   Address,
 } from "@/services/churchService";
-import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { fetchDioceses, Diocese } from "@/services/dioceseService";
 import SearchableSelect from "@/components/SearchableSelect";
@@ -67,10 +76,11 @@ export default function ChurchManagement() {
   const [dioceses, setDioceses] = useState<Diocese[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [viewLoading, setViewLoading] = useState(false);
   const [selectedChurch, setSelectedChurch] = useState<Church | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
@@ -90,7 +100,7 @@ export default function ChurchManagement() {
     district: "",
     houseNumber: "",
     subcity: "",
-    addressType: "EMERGENCY_CONTACT",
+    addressType: "CHURCH_ADDRESS",
   };
 
   const [formState, setFormState] = useState({
@@ -152,6 +162,32 @@ export default function ChurchManagement() {
     );
   }, [churches, searchQuery]);
 
+  const isChurchActive = (c: Church) => ((c as any).isActive ?? (c as any).active) !== false;
+
+  // Merge API address (may contain nulls) over the defaults so inputs stay controlled
+  const normalizeAddress = (a?: Partial<Address> | null): Address => {
+    const merged: any = { ...defaultAddress };
+    Object.entries(a || {}).forEach(([k, v]) => {
+      if (v !== null && v !== undefined) merged[k] = v;
+    });
+    return merged as Address;
+  };
+
+  const handleView = async (church: Church) => {
+    setSelectedChurch(church);
+    setIsViewDialogOpen(true);
+    setViewLoading(true);
+    try {
+      const res = await fetchChurchById(church.id);
+      const fresh: any = (res as any)?.data ?? res;
+      if (fresh && fresh.id) setSelectedChurch({ ...church, ...fresh });
+    } catch {
+      // keep the row data if the detail call fails
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
   const columns: ColumnDef<Church>[] = [
     {
       accessorKey: "name",
@@ -163,7 +199,7 @@ export default function ChurchManagement() {
           </div>
           <div>
             <div className="font-semibold">{row.original.name}</div>
-            <div className="text-sm text-muted-foreground">Diocese: {row.original.diocese}</div>
+            <div className="text-sm text-muted-foreground">{row.original.address?.city || "-"}</div>
           </div>
         </div>
       ),
@@ -211,41 +247,43 @@ export default function ChurchManagement() {
     {
       accessorKey: "isActive",
       header: t("Status"),
-      cell: ({ row }) => (
-        <Badge
-          className={
-            row.original.isActive !== false
-              ? "bg-green-100 text-green-800"
-              : "bg-red-100 text-red-800"
-          }
-        >
-          {row.original.isActive !== false ? "ACTIVE" : "INACTIVE"}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const active = isChurchActive(row.original);
+        return (
+          <Badge className={active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+            {active ? t("ACTIVE") : t("INACTIVE")}
+          </Badge>
+        );
+      },
     },
     {
       id: "actions",
       cell: ({ row }) => (
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => handleEdit(row.original)}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            onClick={() => {
-              setSelectedChurch(row.original);
-              setIsDeleteDialogOpen(true);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="ghost">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleView(row.original)}>
+              <Eye className="h-4 w-4 mr-2" /> {t("View Details")}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleEdit(row.original)}>
+              <Edit className="h-4 w-4 mr-2" /> {t("Edit")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-red-600 focus:text-red-600"
+              onClick={() => {
+                setSelectedChurch(row.original);
+                setIsDeleteDialogOpen(true);
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" /> {t("Delete")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ),
     },
   ];
@@ -263,9 +301,9 @@ export default function ChurchManagement() {
 
   const handleEdit = (church: Church) => {
     setFormState({
-      name: church.name,
-      diocese: church.diocese,
-      address: church.address || { ...defaultAddress },
+      name: church.name || "",
+      diocese: church.diocese || "",
+      address: normalizeAddress(church.address),
     });
     setSelectedChurch(church);
     setActiveTab("basic");
@@ -274,7 +312,7 @@ export default function ChurchManagement() {
 
   const handleSubmit = async () => {
     if (!formState.name || !formState.diocese) {
-      toast.error("Church name and diocese are required fields");
+      toast.error(t("Church name and diocese are required fields"));
       return;
     }
 
@@ -357,6 +395,13 @@ export default function ChurchManagement() {
           </Button>
         </div>
 
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -394,7 +439,12 @@ export default function ChurchManagement() {
                   <SearchableSelect
                     value={formState.diocese}
                     onChange={(value) => setFormState({ ...formState, diocese: value })}
-                    options={dioceses.map((d) => ({ value: d.name, label: d.name }))}
+                    options={[
+                      ...dioceses.map((d) => ({ value: d.name, label: d.name })),
+                      ...(formState.diocese && !dioceses.some((d) => d.name === formState.diocese)
+                        ? [{ value: formState.diocese, label: formState.diocese }]
+                        : []),
+                    ]}
                     placeholder={t("Select a diocese")}
                     searchPlaceholder={t("Search dioceses...")}
                     emptyText={t("No dioceses found")}
@@ -501,15 +551,87 @@ export default function ChurchManagement() {
               <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
                 {t("Cancel")}
               </Button>
-              {activeTab === "basic" ? (
-                <Button type="button" onClick={() => setActiveTab("address")}>
+              {activeTab === "basic" && (
+                <Button type="button" variant={selectedChurch ? "outline" : "default"} onClick={() => setActiveTab("address")}>
                   {t("Next")}
                 </Button>
-              ) : (
+              )}
+              {(activeTab === "address" || selectedChurch) && (
                 <Button onClick={handleSubmit} disabled={isSubmitting}>
                   {isSubmitting ? t("Saving...") : selectedChurch ? t("Update") : t("Create")}
                 </Button>
               )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* View Details Dialog */}
+        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl flex items-center gap-2">
+                <House className="h-6 w-6 text-primary" /> {selectedChurch?.name}
+              </DialogTitle>
+            </DialogHeader>
+            {selectedChurch && (
+              <div className="space-y-5 py-2">
+                {viewLoading && <p className="text-xs text-muted-foreground">{t("Loading...")}</p>}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">{t("Diocese")}</p>
+                    <p className="font-semibold">{selectedChurch.diocese || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">{t("Status")}</p>
+                    <Badge className={isChurchActive(selectedChurch) ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                      {isChurchActive(selectedChurch) ? t("ACTIVE") : t("INACTIVE")}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                    <MapPin className="h-4 w-4" /> {t("Address Details")}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {([
+                      ["Country", "country"],
+                      ["Region", "region"],
+                      ["Zone", "zone"],
+                      ["City", "city"],
+                      ["Subcity", "subcity"],
+                      ["District", "district"],
+                      ["Woreda", "woreda"],
+                      ["Kebele", "kebele"],
+                      ["House Number", "houseNumber"],
+                      ["Street", "street"],
+                    ] as [string, keyof Address][]).map(([label, key]) => (
+                      <div key={key}>
+                        <p className="text-sm text-muted-foreground">{t(label)}</p>
+                        <p className="font-semibold">{(selectedChurch.address as any)?.[key] || "-"}</p>
+                      </div>
+                    ))}
+                    {selectedChurch.address?.additionalInfo && (
+                      <div className="col-span-2">
+                        <p className="text-sm text-muted-foreground">{t("Additional Information")}</p>
+                        <p className="font-semibold">{selectedChurch.address.additionalInfo}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
+                {t("Close")}
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsViewDialogOpen(false);
+                  if (selectedChurch) handleEdit(selectedChurch);
+                }}
+              >
+                <Edit className="h-4 w-4 mr-2" /> {t("Edit")}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
